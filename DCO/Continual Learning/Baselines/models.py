@@ -12,7 +12,7 @@ import utils
 
 class MLP(nn.Module):
     def __init__(self, args, input_size, output_size, hidden_size=400, hidden_layer_num=2, is_bias=False):
-        super().__init__() 
+        super().__init__()
         """ Fully-connected neural network
 
         References:
@@ -39,6 +39,29 @@ class MLP(nn.Module):
         for p1, p2 in zip(self.parameters(), point):
             diff = p1 - p2
             p1.data.add_(-pull_strength, diff.data)
+
+    def print_layers(self):
+        # Print all layers in the model
+        print("Layers in the model:")
+        for name, layer in self.named_modules():
+            if name != "":
+                print(f"{name}: {layer}")
+    def add_hidden_layer(self, layer_index, new_layer_size):
+        if layer_index < 0 or layer_index >= len(self.layers):
+            raise ValueError("Invalid layer_index")
+
+        prev_out_features = self.layers[layer_index].out_features
+        next_in_features = self.layers[layer_index + 2].in_features
+
+        new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
+        self.layers.insert(layer_index + 2, new_layer)
+        self.layers.insert(layer_index + 3, nn.ReLU())
+
+        self.layers[layer_index + 3].in_features = new_layer_size
+
+        if next_in_features != new_layer_size:
+            self.layers[layer_index + 4].in_features = new_layer_size
+
 
 class Conv(nn.Module):
     def __init__(self, args, is_bias = False):

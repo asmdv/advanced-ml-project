@@ -2,6 +2,9 @@ import torch
 import torch.nn.functional as F
 import pdb
 
+OKGREEN = '\033[92m'
+ENDC = '\033[0m'
+
 def train(args, mod_main, opt_main, data, target, is_grad_acc = False):
     '''
         is_grad_acc:    by default we clean up the gradients of classifer
@@ -49,7 +52,7 @@ def train(args, mod_main, opt_main, data, target, is_grad_acc = False):
         main_loss = F.cross_entropy(output, target)
     return main_loss
 
-def test(args, model, test_loader, epoch, prefix=''):
+def test(args, model, test_loader, task_num, epoch, prefix=''):
     '''
         Be careful about the multi-head setup for both loss and error
     '''
@@ -96,8 +99,8 @@ def test(args, model, test_loader, epoch, prefix=''):
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
-    res='[{:2d}] Average TEST Loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-                 epoch, test_loss, correct, len(test_loader.dataset),100. * correct / len(test_loader.dataset))
+    res='Epoch {:2d} | Task {:2d} => Average TEST Loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
+                  epoch, task_num, test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset))
     print(prefix + res)
     return 100. * (1-correct / len(test_loader.dataset))
 
