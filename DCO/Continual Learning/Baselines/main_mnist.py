@@ -203,8 +203,8 @@ def main():
                     break
                 current_point = utils.ravel_model_params(mod_main, False, 'cpu')
                 l2_norm = (current_point - starting_point).norm().item()
-                visdom_obj.line([l2_norm],  [epoch], update='append', opts={'title':'L2 Norm'}, win='l2_norm', name = 'T', env='gpu:%d'%args.rank)
-                visdom_obj.line([sum(errors)/args.num_tasks],  [epoch], update='append', opts={'title':'Average Error'}, win='avg_error', name = 'T', env='gpu:%d'%args.rank)
+                visdom_obj.line([l2_norm],  [global_epoch + epoch], update='append', opts={'title':'L2 Norm'}, win='l2_norm', name = 'T', env='gpu:%d'%args.rank)
+                visdom_obj.line([sum(errors)/args.num_tasks],  [global_epoch + epoch], update='append', opts={'title':'Average Error'}, win='avg_error', name = 'T', env='gpu:%d'%args.rank)
                 result_list += [errors]
 
         if adding_new_hidden_layer:
