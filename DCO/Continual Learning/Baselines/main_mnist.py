@@ -116,9 +116,10 @@ def main():
     assert not (len(tr_loaders[1].dataset) == len(te_loaders[1].dataset)) # just in case the trainining dataset and testing dataset are messed up
 
     global_epoch = 0
-    while True:
+    added_layers_count = 0
+    max_allowed_added_layers = args.max_allowed_added_layers
+    while added_layers_count < max_allowed_added_layers:
         adding_new_hidden_layer = False
-
         # // 2.1 Preparation before the 1st task //
         """ Algorithms:
                 (1) SI (sometimes referred to as PI): the cores of SI are Eq.(4) and Eq.(5)
@@ -208,9 +209,12 @@ def main():
                 result_list += [errors]
 
         if adding_new_hidden_layer:
+            torch.save({args.cl_method: result_list},
+                       'res-checkpoint-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.tasks))
             mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
             mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
             print("New Hidden Layer added. Restarting the training completely...")
+            added_layers_count += 1
             continue
         # 3.1 Preparation before the 2nd and consequent tasks
         """
@@ -552,11 +556,15 @@ def main():
             if adding_new_hidden_layer:
                 break
         if adding_new_hidden_layer:
+            torch.save({args.cl_method: result_list},
+                       'res-checkpoint-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.tasks))
             mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
             mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
             print("New Hidden Layer added. Restarting the training completely...")
+            added_layers_count += 1
             continue
-        torch.save({args.cl_method: result_list}, 'res-%s-%s-%d.pt'%(args.cl_dataset, args.cl_method, args.rank))
+        torch.save({args.cl_method: result_list},
+                   'res-final-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.tasks))
         """
             To check the restuls, in Python3 with torch package imported: 
                 (1) load average errors : average_errors = torch.load('res-%d.pt'%args.rank)
