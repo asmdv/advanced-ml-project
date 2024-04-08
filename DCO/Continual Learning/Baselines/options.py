@@ -72,3 +72,4 @@ parser.add_argument('--push_cone_l2'   , type=float, default=0.0, metavar='Cone_
 parser.add_argument('--cone_batch_size', type=int, default= 128, metavar='CBS')
 parser.add_argument('--main_optimizer', type=str, default='adam')
 parser.add_argument('--wd', type=float, default=0.0, metavar='WD')
+parser.add_argument('--cl_error_threshold', type=float, default=20.0)
