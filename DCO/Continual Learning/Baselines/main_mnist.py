@@ -213,6 +213,7 @@ def main():
                        'res-checkpoint-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.num_tasks))
             mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
             mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
+            mode_main = mod_main.to(args.device)
             print("New Hidden Layer added. Restarting the training completely...")
             added_layers_count += 1
             continue
@@ -560,6 +561,7 @@ def main():
                        'res-checkpoint-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.num_tasks))
             mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
             mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
+            mode_main = mod_main.to(args.device)
             print("New Hidden Layer added. Restarting the training completely...")
             added_layers_count += 1
             continue
