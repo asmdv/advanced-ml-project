@@ -1,39 +1,45 @@
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 def try_plot(data):
-    if isinstance(data, (list, torch.Tensor)):
-        if isinstance(data, torch.Tensor):
-            data = data.numpy()
-        plt.figure(figsize=(10, 6))
-        plt.plot(data)
-        plt.title("Data Plot")
-        plt.xlabel("X-axis")
-        plt.ylabel("Y-axis")
-        plt.show()
-    else:
-        print("Data is not in a directly plottable format.")
+    plt.figure(figsize=(10, 6))
+    plt.plot(data)
+    plt.title("Data Plot")
+    plt.xlabel("X-axis")
+    plt.ylabel("Y-axis")
+    plt.show()
 
-#Please replace 'C:\Users\Dell\Downloads\res-permuted_mnist-dco-0.pt' with your .pt file path
+# Put your file path here
+file_path = ""
+pt_load = torch.load(fr'{file_path}')
 
-data = torch.load(r'C:\Users\Dell\Documents\GitHub\advanced-ml-project\DCO\Continual Learning\Baselines\res-checkpoint-permuted_mnist-sgd-0-tasks-5.pt')
 
-#change 'dco' with the algo used
-if 'sgd' in data:
-    ewc_data = data['sgd']
-    #print(f"Processing ... Type: {type(ewc_data)}")
-    
-    if torch.is_tensor(ewc_data):
-        
-        try_plot(ewc_data)
-    elif isinstance(ewc_data, dict):
-        
-        for key, value in ewc_data.items():
+def column(matrix, i):
+    new = []
+    for row in matrix:
+        print(row)
+        new.append(row[i])
+    return new
+
+
+# change 'dco' with the algo used
+if 'sgd' in pt_load:
+    global_data = pt_load['sgd']
+    # print(f"Processing ... Type: {type(ewc_data)}")
+
+    if torch.is_tensor(global_data):
+
+        try_plot(global_data)
+    elif isinstance(global_data, dict):
+        for key, value in global_data.items():
             print(f"Key: {key}, Value Type: {type(value)}")
             try_plot(value)
-    elif isinstance(ewc_data, list):
-        
-        try_plot(ewc_data)
+    elif isinstance(global_data, list):
+        _data = np.array([row for row in global_data if len(row) == 5])
+        for i in range(_data.shape[1]):
+            try_plot(_data[:, i])
     else:
         print("The 'ewc' data type is not directly supported for plotting.")
 else:
