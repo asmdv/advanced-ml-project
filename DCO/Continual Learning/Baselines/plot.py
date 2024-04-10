@@ -3,16 +3,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def try_plot(data):
+def try_plot(data, title="Data Plot"):
     plt.figure(figsize=(10, 6))
     plt.plot(data)
-    plt.title("Data Plot")
+    plt.title(title)
     plt.xlabel("X-axis")
     plt.ylabel("Y-axis")
     plt.show()
 
 # Put your file path here
-file_path = ""
+file_path = "res-final-permuted_mnist-sgd-0-tasks-5.pt"
 pt_load = torch.load(fr'{file_path}')
 
 
@@ -40,6 +40,9 @@ if 'sgd' in pt_load:
         _data = np.array([row for row in global_data if len(row) == 5])
         for i in range(_data.shape[1]):
             try_plot(_data[:, i])
+        # print(_data)
+        # print(np.mean(_data, axis=1))
+        try_plot(np.mean(_data, axis=1), "Average Error")
     else:
         print("The 'ewc' data type is not directly supported for plotting.")
 else:
