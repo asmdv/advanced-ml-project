@@ -40,4 +40,6 @@ plt.legend(loc='upper right')
 plt.grid(True)
 plt.xticks(range(1, num_epochs + 1))
 
+plt.xticks(fontsize=6)
+
 plt.show()
