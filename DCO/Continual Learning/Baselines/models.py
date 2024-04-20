@@ -46,6 +46,17 @@ class MLP(nn.Module):
         for name, layer in self.named_modules():
             if name != "":
                 print(f"{name}: {layer}")
+
+    def print_grad_req_for_all_params(self):
+        print("Printing all params")
+        for name, param in self.named_parameters():
+            print(name, param.requires_grad)
+    def freeze_all_but_last(model):
+        t = tuple(model.named_parameters())
+        for name, param in t[:-1]:
+            param.requires_grad = False
+        print(f"All layers except the last one frozen successfully.")
+
     def add_hidden_layer(self, layer_index, new_layer_size):
         if layer_index < 0 or layer_index >= len(self.layers):
             raise ValueError("Invalid layer_index")
