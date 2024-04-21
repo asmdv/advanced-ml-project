@@ -88,7 +88,7 @@ def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None, num_worker
     return DataLoader(
         dataset, batch_size=batch_size,
         shuffle=True, collate_fn=(collate_fn or default_collate),
-        **({'num_workers': num_workers, 'pin_memory': True} if cuda else {})
+        # **({'num_workers': num_workers, 'pin_memory': True} if cuda else {})
     )
 
 # TODO: Temporary
