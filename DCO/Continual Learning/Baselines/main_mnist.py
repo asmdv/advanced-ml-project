@@ -674,9 +674,9 @@ def main():
 
         for i in range(1, args.num_tasks + 1):
             cur_error = trainer.test(args, mod_main, te_loaders[i], i,
-                                     global_epoch + (args.num_tasks - 1) * args.cl_epochs + 1)
+                                     global_epoch + (args.num_tasks) * args.cl_epochs + 1)
             errors += [cur_error]
-            visdom_obj.line([cur_error], [global_epoch + (args.num_tasks - 1) * args.cl_epochs + 1],
+            visdom_obj.line([cur_error], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
                             update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
                             name='T', env='gpu:%d' % args.rank)
 
@@ -692,11 +692,11 @@ def main():
         current_point = utils.ravel_model_params(mod_main, False, 'cpu')
         l2_norm = (current_point - starting_point).norm().item()
         result_list += [errors]
-        visdom_obj.line([l2_norm], [global_epoch + (args.num_tasks - 1) * args.cl_epochs + 1],
+        visdom_obj.line([l2_norm], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
                         update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
                         env='gpu:%d' % args.rank)
         visdom_obj.line([sum(errors) / args.num_tasks],
-                        [global_epoch + (args.num_tasks - 1) * args.cl_epochs + 1], update='append',
+                        [global_epoch + (args.num_tasks) * args.cl_epochs + 1], update='append',
                         opts={'title': 'Average Error'}, win='avg_error', name='T',
                         env='gpu:%d' % args.rank)
 
