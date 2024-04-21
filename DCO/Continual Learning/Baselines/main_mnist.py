@@ -709,11 +709,7 @@ def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
     ewc_loss = 0
     main_loss = trainer.train(args, mod_main, opt_main, data, target)
     for mod_main_center, F_grad in zip(mod_main_centers, Fs):
-        print("Mode main center shape", len(mod_main_center))
-        print("Mod main parameters shape", len(list(mod_main.parameters())))
         for p1, p2, coe in zip(mod_main.parameters(), mod_main_center, F_grad):
-            print(f"p1 shape {p1.shape}")
-            print(f"p2.shape {p2.shape}")
             ewc_loss += 1 / 2 * args.ewc_lam * (coe * F.mse_loss(p1, p2, reduction='none')).sum()
     (main_loss + ewc_loss).backward()
     opt_main.step()
@@ -761,14 +757,11 @@ def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, a
     for num, (data, target) in enumerate(ewc_loader, 1):
         main_loss = trainer.train(args, mod_main, opt_main, data, target)
         main_loss.backward()
-        print("Mod main params shape in upgrade_mod_main_ewc", len(list(mod_main.parameters())))
-        print("ewc_grads.shape in upgrade_mod_main_ewc", len(ewc_grads))
         for param, grad in zip(mod_main.parameters(), ewc_grads):
             if param.grad is not None:
                 grad.add_(1 / len(ewc_loader.dataset), param.grad ** 2)
     Fs += [ewc_grads]
     mod_main_centers += [mod_main_center]
-    print("upgrade_mod_main_ewc len: ", len(mod_main_centers))
     return mod_main_centers, Fs
 def create_directory_if_not_exists(directory_path):
     """
