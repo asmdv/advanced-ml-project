@@ -5,6 +5,8 @@ import os
 import shutil
 import torch
 import torch.nn.functional as F
+import datetime
+
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from torchrl.data import ReplayBuffer, ListStorage, LazyTensorStorage, LazyMemmapStorage
@@ -37,12 +39,9 @@ class Tee(object):
             f.flush()
 
 
-def handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf, added_layers_count):
+def handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf, added_layers_count, experiment_name):
     if not (added_layers_count < args.max_allowed_added_layers):
         return mod_main, added_layers_count
-
-    torch.save({args.cl_method: result_list},
-               'res-checkpoint-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.num_tasks))
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
 
     mod_local.freeze_all_but_last()
@@ -87,6 +86,12 @@ class ReplayBufferCL():
             self.buffer.append(rb)
 
 
+def create_experiment_path(args):
+    current_time = datetime.datetime.now()
+    formatted_time = current_time.strftime("%Y-%m-%d_%H_%M_%S")
+    experiment_name = f"experiments/experiment_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_rank_{args.rank}_{formatted_time}"
+    create_directory_if_not_exists(experiment_name)
+    return experiment_name
 
 
 #  -------------- \\ Main codes begin here \\ -------------
@@ -100,12 +105,13 @@ def main():
     torch.manual_seed(args.seed)  # https://pytorch.org/docs/stable/notes/randomness.html
     result_list = []  # average errors for every task with structure (E_1, E_2, ..., E_n)
 
-    # 1.1.1 Set up log file
-    current_time = datetime.now()
-    formatted_time = current_time.strftime("%Y-%m-%d-%H-%M-%S")
 
+    # Create experiment folder
+    experiment_name = create_experiment_path(args)
+
+    # 1.1.1 Set up log file
     orig_stdout = sys.stdout
-    f = open(f'log-{args.cl_method}-num_tasks-{args.num_tasks}-date-{formatted_time}', 'w')
+    f = open(f'{experiment_name}/log.txt', 'w')
     original = sys.stdout
     sys.stdout = Tee(sys.stdout, f)
 
@@ -636,7 +642,7 @@ def main():
 
                 if adding_new_hidden_layer:
                     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args, result_list,
-                                                                                 model_conf, added_layers_count)
+                                                                                 model_conf, added_layers_count, experiment_name)
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
                         Fs = []
@@ -644,6 +650,9 @@ def main():
                             mod_main_centers, Fs = upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, _task, args, opt_main)
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
                     adding_new_hidden_layer = False
+
+            torch.save({"error": result_list},
+                       f'{experiment_name}/checkpoint.pt')
 
         # Doing replay
         if args.cl_method == 'sgd':
@@ -690,8 +699,8 @@ def main():
     # if adding_new_hidden_layer:
     #     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf, added_layers_count)
     #     continue
-    torch.save({args.cl_method: result_list},
-               'res-final-%s-%s-%d-tasks-%d.pt' % (args.cl_dataset, args.cl_method, args.rank, args.num_tasks))
+    torch.save({"error": result_list},
+               f'{experiment_name}/final.pt')
     """
         To check the restuls, in Python3 with torch package imported: 
             (1) load average errors : average_errors = torch.load('res-%d.pt'%args.rank)
