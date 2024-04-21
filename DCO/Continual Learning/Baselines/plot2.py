@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 data_path = '/Users/asif/progs/02-uni/08-advanced-ml-project/DCO/Continual Learning/Baselines/res-checkpoint-permuted_mnist-sgd-0-tasks-5.pt'
 data = torch.load(data_path)
-sgd_data = data['sgd']
+sgd_data = data['error']
 
 
 average_errors_across_tasks = []
