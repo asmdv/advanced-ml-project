@@ -20,7 +20,6 @@ from options import parser
 from data import get_dataset, get_data_loader, get_label_data_loader, map_dataset
 from data import DATASET_CONFIGS, MODEL_CONFIGS
 from algorithm import train_invauto
-from datetime import datetime
 
 
 
@@ -104,8 +103,7 @@ def main():
     args.device = 'cuda:%d' % args.rank if torch.cuda.is_available() else 'cpu'
     utils.save_options(args)
     torch.manual_seed(args.seed)  # https://pytorch.org/docs/stable/notes/randomness.html
-    result_list = []  # average errors for every task with structure (E_1, E_2, ..., E_n)
-
+    save_object = {"errors": [], "n_tasks": args.num_tasks}
 
     # Create experiment folder
     experiment_name = create_experiment_path(args)
@@ -150,7 +148,7 @@ def main():
     # // 1.3 visdom: https://github.com/facebookresearch/visdom //
     """ a open-source visualization tool from facebook (tested on 0.1.8.8 version) """
     try:
-        visdom_obj = utils.get_visdom(args)
+        visdom_obj = utils.get_visdom(args, experiment_name)
     except:
         print('[Visdom] ===> De-activated')
 
@@ -273,7 +271,7 @@ def main():
                 errors += [cur_error]
                 visdom_obj.line([cur_error], [global_epoch + epoch], update='append',
                                 opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i, name='T',
-                                env='gpu:%d' % args.rank)
+                                env=f'{experiment_name}')
                 # Checking only task 1
                 # if epoch % args.lr_epochs == 0 and i == 1 and cur_error > cl_error_threshold:
                 #     print("Current error is bigger than threshold. Adding the new layer.")
@@ -289,10 +287,10 @@ def main():
             current_point = utils.ravel_model_params(mod_main, False, 'cpu')
             l2_norm = (current_point - starting_point).norm().item()
             visdom_obj.line([l2_norm], [global_epoch + epoch], update='append', opts={'title': 'L2 Norm'},
-                            win='l2_norm', name='T', env='gpu:%d' % args.rank)
+                            win='l2_norm', name='T', env=f'{experiment_name}')
             visdom_obj.line([sum(errors) / args.num_tasks], [global_epoch + epoch], update='append',
-                            opts={'title': 'Average Error'}, win='avg_error', name='T', env='gpu:%d' % args.rank)
-            result_list += [errors]
+                            opts={'title': 'Average Error'}, win='avg_error', name='T', env=f'{experiment_name}')
+            save_object["errors"] += [errors]
 
     # if adding_new_hidden_layer:
     #     mod_main = handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf)
@@ -603,7 +601,7 @@ def main():
                     errors += [cur_error]
                     visdom_obj.line([cur_error], [global_epoch + (m_task - 1) * args.cl_epochs + (cl_epoch + 1)],
                                     update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
-                                    name='T', env='gpu:%d' % args.rank)
+                                    name='T', env=f'{experiment_name}')
 
                     # cl_epoch == (args.cl_epochs - 1) and
                     # cl_epoch == (args.cl_epochs - 1) and
@@ -619,27 +617,27 @@ def main():
                         visdom_obj.line([ae_loss[i].item()],
                                         [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
                                         opts={'title': '%d-AE Loss' % i}, win='ae_loss_%d' % i, name='T',
-                                        env='gpu:%d' % args.rank)
+                                        env=f'{experiment_name}')
                     print('The grad norm is', grad_norm)
                     try:
                         visdom_obj.line([grad_norm], [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch],
                                         update='append', opts={'title': 'Grad Norm'}, win='grad_norm', name='T',
-                                        env='gpu:%d' % args.rank)
+                                        env=f'{experiment_name}')
                     except:
                         visdom_obj.line([grad_norm.item()],
                                         [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
                                         opts={'title': 'Grad Norm'}, win='grad_norm', name='T',
-                                        env='gpu:%d' % args.rank)
+                                        env=f'{experiment_name}')
                 current_point = utils.ravel_model_params(mod_main, False, 'cpu')
                 l2_norm = (current_point - starting_point).norm().item()
-                result_list += [errors]
+                save_object["errors"] += [errors]
                 visdom_obj.line([l2_norm], [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch],
                                 update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
-                                env='gpu:%d' % args.rank)
+                                env=f'{experiment_name}')
                 visdom_obj.line([sum(errors) / args.num_tasks],
                                 [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
                                 opts={'title': 'Average Error'}, win='avg_error', name='T',
-                                env='gpu:%d' % args.rank)
+                                env=f'{experiment_name}')
 
                 if adding_new_hidden_layer:
                     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args,
@@ -652,7 +650,7 @@ def main():
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
                     adding_new_hidden_layer = False
 
-            torch.save({"error": result_list},
+            torch.save(save_object,
                        f'{experiment_name}/checkpoint.pt')
 
         # Doing replay
@@ -661,13 +659,14 @@ def main():
         elif args.cl_method == 'ewc':
             handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs)
 
+    errors = []
     for i in range(1, args.num_tasks + 1):
         cur_error = trainer.test(args, mod_main, te_loaders[i], i,
                                  global_epoch + (args.num_tasks) * args.cl_epochs + 1)
         errors += [cur_error]
         visdom_obj.line([cur_error], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
                         update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
-                        name='T', env='gpu:%d' % args.rank)
+                        name='T', env=f'{experiment_name}')
 
         # cl_epoch == (args.cl_epochs - 1) and
         # cl_epoch == (args.cl_epochs - 1) and
@@ -677,17 +676,17 @@ def main():
             # break
         elif i <= m_task:
             print(f"Success. Task {i} Error: {cur_error:.2f}. No need for adding layer")
-
+    print("errors: ", errors)
     current_point = utils.ravel_model_params(mod_main, False, 'cpu')
     l2_norm = (current_point - starting_point).norm().item()
-    result_list += [errors]
+    save_object["errors"] += [errors]
     visdom_obj.line([l2_norm], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
                     update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
-                    env='gpu:%d' % args.rank)
+                    env=f'{experiment_name}')
     visdom_obj.line([sum(errors) / args.num_tasks],
                     [global_epoch + (args.num_tasks) * args.cl_epochs + 1], update='append',
                     opts={'title': 'Average Error'}, win='avg_error', name='T',
-                    env='gpu:%d' % args.rank)
+                    env=f'{experiment_name}')
 
                 # if adding_new_hidden_layer:
                 #     global_epoch += (m_task-1)* args.cl_epochs+cl_epoch
@@ -700,9 +699,9 @@ def main():
     # if adding_new_hidden_layer:
     #     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf, added_layers_count)
     #     continue
-    torch.save({"error": result_list},
+    torch.save(save_object,
                f'{experiment_name}/final.pt')
-    plotter.plot_error_from_data({"error": result_list}, save_path=f'{experiment_name}/plots')
+    plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
 
     """
         To check the restuls, in Python3 with torch package imported: 
@@ -730,21 +729,22 @@ def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
 def handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl):
     print("Running replay sgd")
     for _ in range(5):
-        print(f"Replay iteration {_}")
+        print(f"Replay iteration {_}. Tasks: ", end="")
         for prev_task in range(m_task):
-            print(f"Task {prev_task}")
+            print(f"{prev_task}", end=" ")
             replayBufferData = rbcl.buffer[prev_task].sample()
             train_sgd_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels)
+        print()
 
 def handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs):
-    print("Running replay")
+    print("Running replay ewc")
     for _ in range(5):
-        print(f"Replay iteration {_}")
+        print(f"Replay iteration {_}. Tasks: ", end="")
         for prev_task in range(m_task):
-            print(f"Task {prev_task}")
+            print(f"{prev_task}", end=" ")
             replayBufferData = rbcl.buffer[prev_task].sample()
             train_ewc_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, mod_main_centers, Fs)
-
+        print()
 def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, args, opt_main):
     """
         (1) set batch_size = 1 for `ewc_loader` (a seperate dataloader for EWC method)
