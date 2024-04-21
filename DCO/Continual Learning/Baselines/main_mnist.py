@@ -39,7 +39,7 @@ class Tee(object):
             f.flush()
 
 
-def handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf, added_layers_count, experiment_name):
+def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count, experiment_name):
     if not (added_layers_count < args.max_allowed_added_layers):
         return mod_main, added_layers_count
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
@@ -642,7 +642,7 @@ def main():
                                 env='gpu:%d' % args.rank)
 
                 if adding_new_hidden_layer:
-                    mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args, result_list,
+                    mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args,
                                                                                  model_conf, added_layers_count, experiment_name)
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
