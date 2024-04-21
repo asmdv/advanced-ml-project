@@ -718,13 +718,14 @@ def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
 def handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl):
     print("Running replay sgd")
     for _ in range(5):
+        print(f"Replay iteration {_}")
         for prev_task in range(m_task):
+            print(f"Task {prev_task}")
             replayBufferData = rbcl.buffer[prev_task].sample()
             train_sgd_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels)
 
 def handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs):
     print("Running replay")
-
     for _ in range(5):
         print(f"Replay iteration {_}")
         for prev_task in range(m_task):
