@@ -81,11 +81,9 @@ class ReplayBufferData:
 class ReplayBufferCL():
     def __init__(self, n_tasks, max_size, batch_size):
         self.buffer = []
-        overwrite_directory("./tempdir")
-        tempfile.tempdir = './tempdir'
-        for _ in range(n_tasks):
-            # tempdir = tempfile.TemporaryDirectory(dir='./tempdir')
-            rb = ReplayBuffer(storage=LazyMemmapStorage(max_size=max_size, scratch_dir="./tempdir"), batch_size=batch_size)
+        for t in range(n_tasks):
+            overwrite_directory(f"./tempdir/buffer_{t}")
+            rb = ReplayBuffer(storage=LazyMemmapStorage(max_size=max_size, scratch_dir=f"./tempdir/buffer_{t}"), batch_size=batch_size)
             self.buffer.append(rb)
 
 
