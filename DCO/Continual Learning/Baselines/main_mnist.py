@@ -704,6 +704,8 @@ def main():
                     #     global_epoch += (m_task-1)* args.cl_epochs+cl_epoch
                     #     break
 
+                    # comment
+
             # if adding_new_hidden_layer:
             #     break
         # if adding_new_hidden_layer:
