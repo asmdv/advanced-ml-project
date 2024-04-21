@@ -328,34 +328,7 @@ def main():
         if args.cl_method == 'sgd':
             pass
         elif args.cl_method == 'ewc':
-            """
-                (1) set batch_size = 1 for `ewc_loader` (a seperate dataloader for EWC method)
-                (2) set m_label = m_task - 2 (because we are looking at the last task)
-                (3) we save the elements of diagonal Fisher matrix in `ewc_grads`
-                    and we divide it by the number of data points in ewc_loader at the end
-            """
-            mod_main_center = copy.deepcopy(list(mod_main.parameters()))
-            if dataset_name == 'permuted_mnist':
-                ewc_loader = get_data_loader(get_dataset(dataset_name, m_task - 1, True), batch_size=1, cuda=False)
-
-            elif dataset_name == 'split_mnist' or dataset_name == 'split_cifar10':
-                m_label = m_task - 2
-                ewc_loader = get_label_data_loader(get_dataset(dataset_name, m_task - 1, True), 1, cuda=False,
-                                                   labels=[m_label * 2, m_label * 2 + 1])
-            elif dataset_name == 'split_cifar100':
-                m_label = m_task - 2
-                ewc_loader = get_label_data_loader(get_dataset(dataset_name, m_task - 1, True), 1, cuda=False,
-                                                   labels=[l for l in range(m_label * 10, m_label * 10 + 10)])
-            ewc_grads = []
-            for param in mod_main.parameters():
-                ewc_grads += [torch.zeros_like(param)]
-            for num, (data, target) in enumerate(ewc_loader, 1):
-                main_loss = trainer.train(args, mod_main, opt_main, data, target)
-                main_loss.backward()
-                for param, grad in zip(mod_main.parameters(), ewc_grads):
-                    grad.add_(1 / len(ewc_loader.dataset), param.grad ** 2)
-            Fs += [ewc_grads]
-            mod_main_centers += [mod_main_center]
+            mod_main_centers, Fs = upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, args, opt_main)
         elif args.cl_method == 'si':
             """
                 (1) delta     : track the distance between current parameters and previous parameters
@@ -664,6 +637,11 @@ def main():
                 if adding_new_hidden_layer:
                     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args, result_list,
                                                                                  model_conf, added_layers_count)
+                    if args.cl_method == 'ewc':
+                        mod_main_centers = []
+                        Fs = []
+                        for _task in range(1, m_task + 1):
+                            mod_main_centers, Fs = upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, _task, args, opt_main)
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
                     adding_new_hidden_layer = False
 
@@ -731,7 +709,11 @@ def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
     ewc_loss = 0
     main_loss = trainer.train(args, mod_main, opt_main, data, target)
     for mod_main_center, F_grad in zip(mod_main_centers, Fs):
+        print("Mode main center shape", len(mod_main_center))
+        print("Mod main parameters shape", len(list(mod_main.parameters())))
         for p1, p2, coe in zip(mod_main.parameters(), mod_main_center, F_grad):
+            print(f"p1 shape {p1.shape}")
+            print(f"p2.shape {p2.shape}")
             ewc_loss += 1 / 2 * args.ewc_lam * (coe * F.mse_loss(p1, p2, reduction='none')).sum()
     (main_loss + ewc_loss).backward()
     opt_main.step()
@@ -746,11 +728,48 @@ def handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl):
 
 def handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs):
     print("Running replay")
+
     for _ in range(5):
+        print(f"Replay iteration {_}")
         for prev_task in range(m_task):
+            print(f"Task {prev_task}")
             replayBufferData = rbcl.buffer[prev_task].sample()
             train_ewc_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, mod_main_centers, Fs)
 
+def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, args, opt_main):
+    """
+        (1) set batch_size = 1 for `ewc_loader` (a seperate dataloader for EWC method)
+        (2) set m_label = m_task - 2 (because we are looking at the last task)
+        (3) we save the elements of diagonal Fisher matrix in `ewc_grads`
+            and we divide it by the number of data points in ewc_loader at the end
+    """
+    mod_main_center = copy.deepcopy(list(mod_main.parameters()))
+    if dataset_name == 'permuted_mnist':
+        ewc_loader = get_data_loader(get_dataset(dataset_name, m_task - 1, True), batch_size=1, cuda=False)
+
+    elif dataset_name == 'split_mnist' or dataset_name == 'split_cifar10':
+        m_label = m_task - 2
+        ewc_loader = get_label_data_loader(get_dataset(dataset_name, m_task - 1, True), 1, cuda=False,
+                                           labels=[m_label * 2, m_label * 2 + 1])
+    elif dataset_name == 'split_cifar100':
+        m_label = m_task - 2
+        ewc_loader = get_label_data_loader(get_dataset(dataset_name, m_task - 1, True), 1, cuda=False,
+                                           labels=[l for l in range(m_label * 10, m_label * 10 + 10)])
+    ewc_grads = []
+    for param in mod_main.parameters():
+        ewc_grads += [torch.zeros_like(param)]
+    for num, (data, target) in enumerate(ewc_loader, 1):
+        main_loss = trainer.train(args, mod_main, opt_main, data, target)
+        main_loss.backward()
+        print("Mod main params shape in upgrade_mod_main_ewc", len(list(mod_main.parameters())))
+        print("ewc_grads.shape in upgrade_mod_main_ewc", len(ewc_grads))
+        for param, grad in zip(mod_main.parameters(), ewc_grads):
+            if param.grad is not None:
+                grad.add_(1 / len(ewc_loader.dataset), param.grad ** 2)
+    Fs += [ewc_grads]
+    mod_main_centers += [mod_main_center]
+    print("upgrade_mod_main_ewc len: ", len(mod_main_centers))
+    return mod_main_centers, Fs
 def create_directory_if_not_exists(directory_path):
     """
     Create a directory if it doesn't exist.
