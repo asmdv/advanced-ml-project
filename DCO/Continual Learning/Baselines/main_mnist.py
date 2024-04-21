@@ -6,7 +6,7 @@ import shutil
 import torch
 import torch.nn.functional as F
 import datetime
-
+import plotter
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from torchrl.data import ReplayBuffer, ListStorage, LazyTensorStorage, LazyMemmapStorage
@@ -91,6 +91,7 @@ def create_experiment_path(args):
     formatted_time = current_time.strftime("%Y-%m-%d_%H_%M_%S")
     experiment_name = f"experiments/experiment_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_rank_{args.rank}_{formatted_time}"
     create_directory_if_not_exists(experiment_name)
+    create_directory_if_not_exists(f"{experiment_name}/plots")
     return experiment_name
 
 
@@ -701,6 +702,8 @@ def main():
     #     continue
     torch.save({"error": result_list},
                f'{experiment_name}/final.pt')
+    plotter.plot_error_from_data({"error": result_list}, save_path=f'{experiment_name}/plots')
+
     """
         To check the restuls, in Python3 with torch package imported: 
             (1) load average errors : average_errors = torch.load('res-%d.pt'%args.rank)
