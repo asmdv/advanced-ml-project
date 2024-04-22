@@ -88,7 +88,7 @@ class ReplayBufferCL():
 def create_experiment_path(args):
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime("%Y-%m-%d_%H_%M_%S")
-    experiment_name = f"experiments/experiment_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_rank_{args.rank}_{formatted_time}"
+    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_rank_{args.rank}_max_layers_{args.max_allowed_added_layers}_{formatted_time}"
     create_directory_if_not_exists(experiment_name)
     create_directory_if_not_exists(f"{experiment_name}/plots")
     return experiment_name
