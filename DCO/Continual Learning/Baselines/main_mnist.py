@@ -119,6 +119,10 @@ def main():
 
     rbcl = ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size, batch_size=args.replay_buffer_batch_size)
 
+    args.added_layer_conf = handle_layer_conf_args(args.added_layer_conf)
+    if (args.added_layer_conf[0] != 0 and args.max_allowed_added_layers == 0) or (args.added_layer_conf[0] == 0 and args.max_allowed_added_layers != 0):
+        raise Exception(f"Arguments provided are incompatible. Please change either them:\n--added_layer_conf[0] => {args.added_layer_conf[0]}\n--max_allowed_added_layers => {args.max_allowed_added_layers}")
+
     # Create experiment folder
     experiment_name = create_experiment_path(args)
 
@@ -128,9 +132,6 @@ def main():
     original = sys.stdout
     sys.stdout = Tee(sys.stdout, f)
 
-    args.added_layer_conf = handle_layer_conf_args(args.added_layer_conf)
-    if (args.added_layer_conf[0] != 0 and args.max_allowed_added_layers == 0) or (args.added_layer_conf[0] == 0 and args.max_allowed_added_layers != 0):
-        raise Exception(f"Arguments provided are incompatible. Please change either them:\n--added_layer_conf[0] => {args.added_layer_conf[0]}\n--max_allowed_added_layers => {args.max_allowed_added_layers}")
 
     # // 1.2 Main model //
     """
