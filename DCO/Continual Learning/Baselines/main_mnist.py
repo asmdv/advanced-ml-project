@@ -60,23 +60,6 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     return mod_main, added_layers_count + 1
 
 
-# class Experience:
-#     def __init__(self, image, label):
-#         self.image = image
-#         self.label = label
-#     def __len__(self):
-#         return 1
-
-
-# new = torch.cat((data, target))
-# buffer_lazymemmap = ReplayBuffer(
-#     storage=LazyMemmapStorage(max_size=600, scratch_dir=tempdir), batch_size=12)
-# buffer_lazymemmap.extend(data)
-# print(f"The buffer has {len(buffer_lazymemmap)} elements")
-# sample = buffer_lazymemmap.sample()
-# print("sample:", sample.images)
-# return
-
 @tensorclass
 class ReplayBufferData:
     images: torch.Tensor
