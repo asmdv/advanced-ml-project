@@ -3,6 +3,7 @@ import math
 import time
 import sys
 import os
+import string
 import shutil
 import torch
 import torch.nn.functional as F
@@ -81,12 +82,17 @@ class ReplayBufferData:
     images: torch.Tensor
     labels: torch.Tensor
 
+def generate_random_string(length):
+    letters = string.ascii_letters
+    return ''.join(random.choice(letters) for _ in range(length))
+
 
 class ReplayBufferCL():
     def __init__(self, n_tasks, max_size, batch_size):
         self.buffer = []
+        salt = generate_random_string(8)
         for t in range(n_tasks):
-            overwrite_directory(f"./tempdir/buffer_{t}")
+            overwrite_directory(f"./tempdir/{salt}/buffer_{t}")
             rb = ReplayBuffer(storage=LazyMemmapStorage(max_size=max_size, scratch_dir=f"./tempdir/buffer_{t}"), batch_size=batch_size)
             self.buffer.append(rb)
 
