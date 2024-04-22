@@ -149,7 +149,8 @@ def main():
     """ a open-source visualization tool from facebook (tested on 0.1.8.8 version) """
     try:
         visdom_obj = utils.get_visdom(args, experiment_name)
-    except:
+    except Exception as e:
+        print(e)
         print('[Visdom] ===> De-activated')
 
     # // 1.4 Define task datasets and their dataloders // 
