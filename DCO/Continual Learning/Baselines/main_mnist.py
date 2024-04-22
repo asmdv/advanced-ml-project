@@ -23,7 +23,7 @@ from options import parser
 from data import get_dataset, get_data_loader, get_label_data_loader, map_dataset
 from data import DATASET_CONFIGS, MODEL_CONFIGS
 from algorithm import train_invauto
-
+import train_utils
 
 
 
@@ -60,10 +60,7 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     return mod_main, added_layers_count + 1
 
 
-@tensorclass
-class ReplayBufferData:
-    images: torch.Tensor
-    labels: torch.Tensor
+
 
 def generate_random_string(length):
     letters = string.ascii_letters
@@ -100,7 +97,8 @@ def main():
     torch.manual_seed(args.seed)  # https://pytorch.org/docs/stable/notes/randomness.html
     save_object = {"errors": [], "n_tasks": args.num_tasks}
 
-    rbcl = ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size, batch_size=args.replay_buffer_batch_size)
+    if args.replay_buffer_batch_size:
+        rbcl = ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size, batch_size=args.replay_buffer_batch_size)
 
     args.added_layer_conf = handle_layer_conf_args(args.added_layer_conf)
     if (args.added_layer_conf[0] != 0 and args.max_allowed_added_layers == 0) or (args.added_layer_conf[0] == 0 and args.max_allowed_added_layers != 0):
@@ -221,17 +219,15 @@ def main():
         (3) big_omega: track the distance between current parameters and previous parameters
     """
     print(f"Training task 1")
+
+
     cur_iteration = 0
     for epoch in range(1, args.lr_epochs + 1):
-        random_replay_batch_id = random.sample(range(1, len(tr_loaders[1])), math.ceil(args.replay_buffer_batch_size / args.train_batch_size))
+        random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
         for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
-            if batch_idx in random_replay_batch_id:
-                replayBufferData = ReplayBufferData(
-                    images=data,
-                    labels=target,
-                    batch_size=[args.train_batch_size],
-                )
-                rbcl.buffer[0].extend(replayBufferData)
+            if batch_idx in random_replay_batch_ids:
+                train_utils.add_to_replay_buffer(rbcl, m_task, data, target, args)
+
             cur_iteration += 1
             if args.cl_method == 'si' or args.cl_method == 'rwalk':
                 param1 = utils.ravel_model_params(mod_main, False, 'cpu')
@@ -428,25 +424,23 @@ def main():
         # training
         cur_iteration = 0
         for cl_epoch in range(args.cl_epochs):
-            random_replay_batch_id = random.sample(range(1, len(tr_loaders[m_task])),
-                                                   math.ceil(args.replay_buffer_batch_size / args.train_batch_size))
+            random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
-                if batch_idx in random_replay_batch_id:
-                    replayBufferData = ReplayBufferData(
-                        images=data,
-                        labels=target,
-                        batch_size=[args.train_batch_size],
-                    )
-                    # print("Adding replay buffer, mtask: ", m_task)
-                    rbcl.buffer[m_task-1].extend(replayBufferData)
-                    # print("Sample data for 1 buffer: ", rbcl.buffer[1].sample())
-                    # print("Sample data for 0 buffer: ", rbcl.buffer[0].sample())
+                if batch_idx in random_replay_batch_ids:
+                    train_utils.add_to_replay_buffer(rbcl, m_task, data, target, args)
+
+                samples = train_utils.get_samples(rbcl, m_task)
+
                 cur_iteration += 1
                 if args.cl_method == 'sgd':
-                    train_sgd_cl(args, mod_main, opt_main, data, target)
+                    train_utils.train_sgd_cl(args, mod_main, opt_main, data, target)
+                    train_utils.train_sgd_cl_replay(samples, args, mod_main, opt_main)
+
                 elif args.cl_method == 'ewc':
-                    train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs)
+                    train_utils.train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs)
+                    train_utils.train_ewc_cl_replay(samples, args, mod_main, opt_main, mod_main_centers, Fs)
+
                 elif args.cl_method == 'si':
                     """ SI algorithm adds per-parameter regularization loss to the total loss """
                     param1 = utils.ravel_model_params(mod_main, False, 'cpu')
@@ -544,7 +538,8 @@ def main():
                     utils.assign_model_params(m_grad, mod_main, True)
                     opt_main.step()
                 elif args.cl_method == 'dco':
-                    ae_loss, grad_norm = train_dco_cl()
+                    ae_loss, grad_norm = train_utils.train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+                    ae_loss, grad_norm = train_utils.train_dco_cl_replay(samples, args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
                     # for i in range(1, m_task):
                     #     _, _, diff = mod_main.module.pull2point(mod_main_centers[i], pull_strength=args.ae_offline_ps) # pull to the center variavle
                 else:
@@ -616,13 +611,13 @@ def main():
             torch.save(save_object,
                        f'{experiment_name}/checkpoint.pt')
 
-        # Doing replay
-        if args.cl_method == 'sgd':
-            handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl)
-        elif args.cl_method == 'ewc':
-            handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs)
-        elif args.cl_method == 'dco':
-            handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+        # # Doing replay - old way
+        # if args.cl_method == 'sgd':
+        #     handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl)
+        # elif args.cl_method == 'ewc':
+        #     handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs)
+        # elif args.cl_method == 'dco':
+        #     handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
 
     errors = []
     for i in range(1, args.num_tasks + 1):
@@ -673,67 +668,41 @@ def main():
             (2) print average errors: print(average_errors[args.cl_method])
     """
 
-def train_sgd_cl(args, mod_main, opt_main, data, target):
-    main_loss = trainer.train(args, mod_main, opt_main, data, target)
-    main_loss.backward()
-    opt_main.step()
 
 
-def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
-    """ For each task we save a seperate Fisher matrix and a set of optimal parameters. """
-    ewc_loss = 0
-    main_loss = trainer.train(args, mod_main, opt_main, data, target)
-    for mod_main_center, F_grad in zip(mod_main_centers, Fs):
-        for p1, p2, coe in zip(mod_main.parameters(), mod_main_center, F_grad):
-            ewc_loss += 1 / 2 * args.ewc_lam * (coe * F.mse_loss(p1, p2, reduction='none')).sum()
-    (main_loss + ewc_loss).backward()
-    opt_main.step()
 
 
-def train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes):
-    main_loss = trainer.train(args, mod_main, opt_main, data, target)
-    ae_loss = []
-    for i in range(1, m_task):
-        ae_loss += [
-            trainer.ae_reg(args, mod_main, mod_main_centers[i], cl_opt_main, mod_aes[i], opt_aes[i],
-                           data, target)]
-    sum(ae_loss).backward()
-    grad_norm = torch.nn.utils.clip_grad_norm_(mod_main.parameters(), args.ae_grad_norm)
-    # cur_iteration
-    main_loss.backward()
-    opt_main.step()
-    return ae_loss, grad_norm
 
 
-def handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl):
-    print("Running replay sgd")
-    for _ in range(5):
-        print(f"Replay iteration {_}. Tasks: ", end="")
-        for prev_task in range(m_task):
-            print(f"{prev_task}", end=" ")
-            replayBufferData = rbcl.buffer[prev_task].sample()
-            train_sgd_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels)
-        print()
+# def handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl):
+#     print("Running replay sgd")
+#     for _ in range(5):
+#         print(f"Replay iteration {_}. Tasks: ", end="")
+#         for prev_task in range(m_task):
+#             print(f"{prev_task}", end=" ")
+#             replayBufferData = rbcl.buffer[prev_task].sample()
+#             train_utils.train_sgd_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels)
+#         print()
+#
+# def handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs):
+#     print("Running replay ewc")
+#     for _ in range(5):
+#         print(f"Replay iteration {_}. Tasks: ", end="")
+#         for prev_task in range(m_task):
+#             print(f"{prev_task}", end=" ")
+#             replayBufferData = rbcl.buffer[prev_task].sample()
+#             train_utils.train_ewc_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, mod_main_centers, Fs)
+#         print()
 
-def handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs):
-    print("Running replay ewc")
-    for _ in range(5):
-        print(f"Replay iteration {_}. Tasks: ", end="")
-        for prev_task in range(m_task):
-            print(f"{prev_task}", end=" ")
-            replayBufferData = rbcl.buffer[prev_task].sample()
-            train_ewc_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, mod_main_centers, Fs)
-        print()
-
-def handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes):
-    print("Running replay ewc")
-    for _ in range(5):
-        print(f"Replay iteration {_}. Tasks: ", end="")
-        for prev_task in range(m_task):
-            print(f"{prev_task}", end=" ")
-            replayBufferData = rbcl.buffer[prev_task].sample()
-            train_dco_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
-        print()
+# def handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes):
+#     print("Running replay ewc")
+#     for _ in range(5):
+#         print(f"Replay iteration {_}. Tasks: ", end="")
+#         for prev_task in range(m_task):
+#             print(f"{prev_task}", end=" ")
+#             replayBufferData = rbcl.buffer[prev_task].sample()
+#             train_dco_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+#         print()
 
 def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, args, opt_main):
     """
