@@ -16,9 +16,9 @@ from torchvision import datasets, transforms
 # ------- Visdom ------------
 def get_visdom(args, experiment_name):
     vis = visdom.Visdom()
-    if args.rank == 0:
-        for env in vis.get_env_list():
-            vis.delete_env(env)
+    # if args.rank == 0:
+    #     for env in vis.get_env_list():
+    #         vis.delete_env(env)
     message = ''
     message += '----------------- Options ---------------\n'
     for k, v in sorted(vars(args).items()):
