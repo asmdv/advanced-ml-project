@@ -1,4 +1,5 @@
 import copy
+import math
 import time
 import sys
 import os
@@ -6,6 +7,7 @@ import shutil
 import torch
 import torch.nn.functional as F
 import datetime
+import random
 import plotter
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
@@ -45,14 +47,12 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     if args.freeze:
         mod_local.freeze_all_but_last()
 
-    print("Before layers", mod_local.layers)
-
     if args.added_layer_conf[1] == 0:
         args.added_layer_conf[1] = model_conf['s_layer']
-    for _ in range(args.added_layer_conf[0]):
-        mod_local.add_hidden_layer(len(mod_local.layers) - 3 - args.added_layer_conf[2] * 2, args.added_layer_conf[1])
 
-    print("After layers", mod_local.layers)
+    for _ in range(args.added_layer_conf[0]):
+        mod_local.add_hidden_layerV2(len(mod_local.layers) - 3 - args.added_layer_conf[2] * 2, args.added_layer_conf[1], same=args.added_layer_conf[1] == model_conf['s_layer'])
+
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     mod_main = mod_main.to(args.device)
@@ -97,7 +97,7 @@ def create_experiment_path(args):
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime("%Y-%m-%d_%H_%M_%S")
     freeze_name = "freeze" if args.freeze else "no-freeze"
-    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_threshold_{args.cl_error_threshold}_max_layers_{args.max_allowed_added_layers}_{freeze_name}_{formatted_time}"
+    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_threshold_{args.cl_error_threshold}_max_layers_{args.max_allowed_added_layers}_{freeze_name}_layers_{'_'.join(args.added_layer_conf)}_{formatted_time}"
     create_directory_if_not_exists(experiment_name)
     create_directory_if_not_exists(f"{experiment_name}/plots")
     return experiment_name
@@ -105,7 +105,6 @@ def create_experiment_path(args):
 
 #  -------------- \\ Main codes begin here \\ -------------
 def main():
-    rbcl = ReplayBufferCL(n_tasks=5, max_size=1200, batch_size=128)
     # // 1.1 Arguments //
     print('[INIT] ===> Defining models in process')
     args = parser.parse_args()
@@ -113,6 +112,8 @@ def main():
     utils.save_options(args)
     torch.manual_seed(args.seed)  # https://pytorch.org/docs/stable/notes/randomness.html
     save_object = {"errors": [], "n_tasks": args.num_tasks}
+
+    rbcl = ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size, batch_size=args.replay_buffer_batch_size)
 
     # Create experiment folder
     experiment_name = create_experiment_path(args)
@@ -232,11 +233,11 @@ def main():
         (3) big_omega: track the distance between current parameters and previous parameters
     """
     print(f"Training task 1")
-
     cur_iteration = 0
     for epoch in range(1, args.lr_epochs + 1):
+        random_replay_batch_id = random.sample(range(1, len(tr_loaders[1])), math.ceil(args.replay_buffer_batch_size / args.train_batch_size))
         for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
-            if batch_idx == 1 or batch_idx == 2 or batch_idx == 3:
+            if batch_idx in random_replay_batch_id:
                 replayBufferData = ReplayBufferData(
                     images=data,
                     labels=target,
@@ -478,9 +479,12 @@ def main():
         # training
         cur_iteration = 0
         for cl_epoch in range(args.cl_epochs):
+            random_replay_batch_id = random.sample(range(1, len(tr_loaders[m_task])),
+                                                   math.ceil(args.replay_buffer_batch_size / args.train_batch_size))
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
-                if batch_idx == 1 or batch_idx == 2 or batch_idx == 3:
+                if batch_idx in random_replay_batch_id:
+                    print("Batch: ", batch_idx)
                     replayBufferData = ReplayBufferData(
                         images=data,
                         labels=target,
@@ -690,7 +694,6 @@ def main():
             # break
         elif i <= m_task:
             print(f"Success. Task {i} Error: {cur_error:.2f}. No need for adding layer")
-    print("errors: ", errors)
     current_point = utils.ravel_model_params(mod_main, False, 'cpu')
     l2_norm = (current_point - starting_point).norm().item()
     save_object["errors"] += [errors]

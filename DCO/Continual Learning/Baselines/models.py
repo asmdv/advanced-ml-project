@@ -57,21 +57,35 @@ class MLP(nn.Module):
             param.requires_grad = False
         print(f"All layers except the last one frozen successfully.")
 
-    def add_hidden_layer(self, layer_index, new_layer_size):
+
+    def add_hidden_layerV2(self, layer_index, new_layer_size, same=False):
         if layer_index < 0 or layer_index >= len(self.layers):
             raise ValueError("Invalid layer_index")
-        # print("Layer index: ", layer_index)
-        # print("Layer new layer size: ", new_layer_size)
-        # print("Layers init: ", self.layers)
+
         prev_out_features = self.layers[layer_index].out_features
         next_in_features = self.layers[layer_index + 2].in_features
+        print(f"New Hidden Layer is the same as others: {same}")
+        if not same:
+            new_layer_before = nn.Linear(prev_out_features, new_layer_size, bias=False)
+            new_layer_after = nn.Linear(new_layer_size, next_in_features, bias=False)
+            new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
 
-        new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
-        self.layers.insert(layer_index + 2, new_layer)
-        self.layers.insert(layer_index + 3, nn.ReLU())
+            self.layers.insert(layer_index + 2, new_layer_before)
+            self.layers.insert(layer_index + 3, nn.ReLU())
+
+            self.layers.insert(layer_index + 4, new_layer)
+            self.layers.insert(layer_index + 5, nn.ReLU())
+
+            self.layers.insert(layer_index + 6, new_layer_after)
+            self.layers.insert(layer_index + 7, nn.ReLU())
+        else:
+            new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
+            self.layers.insert(layer_index + 2, new_layer)
+            self.layers.insert(layer_index + 3, nn.ReLU())
+
         # print("Layers after insert: ", self.layers)
         # print("self.layers[layer_index + 3].in_features before", self.layers[layer_index + 3].in_features)
-        self.layers[layer_index + 4].in_features = new_layer_size
+        # self.layers[layer_index + 4].in_features = new_layer_size
         # print("Layers after in featues change insert: ", self.layers)
 
         # if next_in_features != new_layer_size:
