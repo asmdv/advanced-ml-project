@@ -101,7 +101,7 @@ def create_experiment_path(args):
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime("%Y-%m-%d_%H_%M_%S")
     freeze_name = "freeze" if args.freeze else "no-freeze"
-    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_threshold_{args.cl_error_threshold}_max_layers_{args.max_allowed_added_layers}_{freeze_name}_layers_{'_'.join(args.added_layer_conf)}_rb_{args.replay_buffer_batch_size}_{formatted_time}"
+    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_threshold_{args.cl_error_threshold}_max_layers_{args.max_allowed_added_layers}_{freeze_name}_layers_{'_'.join(str(x) for x in args.added_layer_conf)}_rb_{args.replay_buffer_batch_size}_{formatted_time}"
     create_directory_if_not_exists(experiment_name)
     create_directory_if_not_exists(f"{experiment_name}/plots")
     return experiment_name
