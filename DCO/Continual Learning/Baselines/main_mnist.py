@@ -49,9 +49,7 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
 
     if args.added_layer_conf[1] == 0:
         args.added_layer_conf[1] = model_conf['s_layer']
-
-    for _ in range(args.added_layer_conf[0]):
-        mod_local.add_hidden_layerV2(len(mod_local.layers) - 3 - args.added_layer_conf[2] * 2, args.added_layer_conf[1], same=args.added_layer_conf[1] == model_conf['s_layer'])
+    mod_local.add_hidden_layerV2(len(mod_local.layers) - 3 - args.added_layer_conf[2] * 2, args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'])
 
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
@@ -484,7 +482,6 @@ def main():
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
                 if batch_idx in random_replay_batch_id:
-                    print("Batch: ", batch_idx)
                     replayBufferData = ReplayBufferData(
                         images=data,
                         labels=target,
