@@ -438,46 +438,7 @@ def main():
             """
                 Notice that we train for extra `args.prox_epochs` epochs for our method
             """
-            # Method 1: pushing inside the cone
-            # mod_main_center = copy.deepcopy(list(mod_main.parameters()))
-            # for _ in range(args.prox_epochs-1):
-            #     for batch_idx, (data, target) in enumerate(tr_loaders[m_task-1], 1):
-            #         main_loss = trainer.train(args, mod_main, opt_main, data, target)
-            #         main_loss.backward()
-            #         opt_main.step()
-            #         mod_main.module.pull2point(mod_main_center, pull_strength=0.1) # pull to the center variavle
-            # for data, target in tr_loaders[m_task-1]:
-            #     main_loss = trainer.train(args, mod_main, opt_main, data, target)
-            #     main_loss.backward()
-            #     opt_main.step()
-            #     mod_main.module.pull2point(mod_main_center, pull_strength=0.1) # pull to the center variavle
-            # center_estimations = utils.ravel_model_params(mod_main, False, args.device)
-
-            # Method 2: pushing inside the cone
-            mod_main_center = copy.deepcopy(list(mod_main.parameters()))
-            corner1 = utils.ravel_model_params(mod_main, False, 'cpu')
-            corner1.zero_()
-            corner2 = corner1.clone()
-            for ep in range(args.prox_epochs):
-                for batch_idx, (data, target) in enumerate(tr_loaders[m_task - 1], 1):
-                    main_loss = trainer.train(args, mod_main, opt_main, data, target)
-                    main_loss.backward()
-                    opt_main.step()
-                    if ep == 0 and batch_idx <= 16:
-                        corner1.add_(1 / 16, utils.ravel_model_params(mod_main, False, 'cpu'))
-                    if ep == args.prox_epochs - 1 and batch_idx > len(tr_loaders[m_task - 1]) - 16:
-                        corner2.add_(1 / 16, utils.ravel_model_params(mod_main, False, 'cpu'))
-            move_step = corner2 - corner1
-            center_estimations = corner1 + move_step / move_step.norm() * args.push_cone_l2
-
-            utils.assign_model_params(center_estimations, mod_main, is_grad=False)
-            mod_main_centers += [copy.deepcopy(list(mod_main.parameters()))]
-            mod_ae, opt_ae = train_invauto(args, m_task - 2, mod_main, mod_main_centers[m_task - 1],
-                                           tr_loaders[m_task - 1], visdom_obj)
-            mod_aes += [mod_ae]
-            opt_aes += [opt_ae]
-            print('[AE/CL] ===> Using AE model for Continual Learning')
-            cl_opt_main = torch.optim.Adam(mod_main.parameters(), lr=args.main_online_lr)
+            mod_main_centers, mod_aes, opt_aes, cl_opt_main = upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, m_task, opt_main, visdom_obj)
         else:
             raise ValueError('No named method')
 
@@ -600,17 +561,7 @@ def main():
                     utils.assign_model_params(m_grad, mod_main, True)
                     opt_main.step()
                 elif args.cl_method == 'dco':
-                    main_loss = trainer.train(args, mod_main, opt_main, data, target)
-                    ae_loss = []
-                    for i in range(1, m_task):
-                        ae_loss += [
-                            trainer.ae_reg(args, mod_main, mod_main_centers[i], cl_opt_main, mod_aes[i], opt_aes[i],
-                                           data, target)]
-                    sum(ae_loss).backward()
-                    grad_norm = torch.nn.utils.clip_grad_norm_(mod_main.parameters(), args.ae_grad_norm)
-                    # cur_iteration
-                    main_loss.backward()
-                    opt_main.step()
+                    ae_loss, grad_norm = train_dco_cl()
                     # for i in range(1, m_task):
                     #     _, _, diff = mod_main.module.pull2point(mod_main_centers[i], pull_strength=args.ae_offline_ps) # pull to the center variavle
                 else:
@@ -669,6 +620,13 @@ def main():
                         Fs = []
                         for _task in range(1, m_task + 1):
                             mod_main_centers, Fs = upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, _task, args, opt_main)
+                    elif args.cl_method == 'dco':
+                        mod_aes, opt_aes = [0], [0]
+                        mod_main_centers = [0]
+                        for _task in range(1, m_task + 1):
+                            mod_main_centers, mod_aes, opt_aes, cl_opt_main = upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, m_task, opt_main, visdom_obj)
+
+
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
                     adding_new_hidden_layer = False
 
@@ -680,6 +638,8 @@ def main():
             handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl)
         elif args.cl_method == 'ewc':
             handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs)
+        elif args.cl_method == 'dco':
+            handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
 
     errors = []
     for i in range(1, args.num_tasks + 1):
@@ -747,6 +707,21 @@ def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
     opt_main.step()
 
 
+def train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes):
+    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+    ae_loss = []
+    for i in range(1, m_task):
+        ae_loss += [
+            trainer.ae_reg(args, mod_main, mod_main_centers[i], cl_opt_main, mod_aes[i], opt_aes[i],
+                           data, target)]
+    sum(ae_loss).backward()
+    grad_norm = torch.nn.utils.clip_grad_norm_(mod_main.parameters(), args.ae_grad_norm)
+    # cur_iteration
+    main_loss.backward()
+    opt_main.step()
+    return ae_loss, grad_norm
+
+
 def handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl):
     print("Running replay sgd")
     for _ in range(5):
@@ -766,6 +741,17 @@ def handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, 
             replayBufferData = rbcl.buffer[prev_task].sample()
             train_ewc_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, mod_main_centers, Fs)
         print()
+
+def handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes):
+    print("Running replay ewc")
+    for _ in range(5):
+        print(f"Replay iteration {_}. Tasks: ", end="")
+        for prev_task in range(m_task):
+            print(f"{prev_task}", end=" ")
+            replayBufferData = rbcl.buffer[prev_task].sample()
+            train_dco_cl(args, mod_main, opt_main, replayBufferData.images, replayBufferData.labels, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+        print()
+
 def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, args, opt_main):
     """
         (1) set batch_size = 1 for `ewc_loader` (a seperate dataloader for EWC method)
@@ -797,6 +783,50 @@ def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, a
     Fs += [ewc_grads]
     mod_main_centers += [mod_main_center]
     return mod_main_centers, Fs
+
+
+def upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, m_task, opt_main, visdom_obj):
+    # Method 1: pushing inside the cone
+    # mod_main_center = copy.deepcopy(list(mod_main.parameters()))
+    # for _ in range(args.prox_epochs-1):
+    #     for batch_idx, (data, target) in enumerate(tr_loaders[m_task-1], 1):
+    #         main_loss = trainer.train(args, mod_main, opt_main, data, target)
+    #         main_loss.backward()
+    #         opt_main.step()
+    #         mod_main.module.pull2point(mod_main_center, pull_strength=0.1) # pull to the center variavle
+    # for data, target in tr_loaders[m_task-1]:
+    #     main_loss = trainer.train(args, mod_main, opt_main, data, target)
+    #     main_loss.backward()
+    #     opt_main.step()
+    #     mod_main.module.pull2point(mod_main_center, pull_strength=0.1) # pull to the center variavle
+    # center_estimations = utils.ravel_model_params(mod_main, False, args.device)
+
+    # Method 2: pushing inside the cone
+    mod_main_center = copy.deepcopy(list(mod_main.parameters()))
+    corner1 = utils.ravel_model_params(mod_main, False, 'cpu')
+    corner1.zero_()
+    corner2 = corner1.clone()
+    for ep in range(args.prox_epochs):
+        for batch_idx, (data, target) in enumerate(tr_loaders[m_task - 1], 1):
+            main_loss = trainer.train(args, mod_main, opt_main, data, target)
+            main_loss.backward()
+            opt_main.step()
+            if ep == 0 and batch_idx <= 16:
+                corner1.add_(1 / 16, utils.ravel_model_params(mod_main, False, 'cpu'))
+            if ep == args.prox_epochs - 1 and batch_idx > len(tr_loaders[m_task - 1]) - 16:
+                corner2.add_(1 / 16, utils.ravel_model_params(mod_main, False, 'cpu'))
+    move_step = corner2 - corner1
+    center_estimations = corner1 + move_step / move_step.norm() * args.push_cone_l2
+
+    utils.assign_model_params(center_estimations, mod_main, is_grad=False)
+    mod_main_centers += [copy.deepcopy(list(mod_main.parameters()))]
+    mod_ae, opt_ae = train_invauto(args, m_task - 2, mod_main, mod_main_centers[m_task - 1],
+                                   tr_loaders[m_task - 1], visdom_obj)
+    mod_aes += [mod_ae]
+    opt_aes += [opt_ae]
+    print('[AE/CL] ===> Using AE model for Continual Learning')
+    cl_opt_main = torch.optim.Adam(mod_main.parameters(), lr=args.main_online_lr)
+    return mod_main_centers, mod_aes, opt_aes, cl_opt_main
 def create_directory_if_not_exists(directory_path):
     """
     Create a directory if it doesn't exist.
