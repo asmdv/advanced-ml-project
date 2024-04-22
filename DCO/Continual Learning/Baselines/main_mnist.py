@@ -44,10 +44,18 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
     if args.freeze:
         mod_local.freeze_all_but_last()
-    mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
+
+    print("Before layers", mod_local.layers)
+
+    if args.added_layer_conf[1] == 0:
+        args.added_layer_conf[1] = model_conf['s_layer']
+    for _ in range(args.added_layer_conf[0]):
+        mod_local.add_hidden_layer(len(mod_local.layers) - 3 - args.added_layer_conf[2] * 2, args.added_layer_conf[1])
+
+    print("After layers", mod_local.layers)
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
-    mode_main = mod_main.to(args.device)
+    mod_main = mod_main.to(args.device)
     print("New Hidden Layer added.")
 
     return mod_main, added_layers_count + 1
@@ -114,6 +122,10 @@ def main():
     f = open(f'{experiment_name}/log.txt', 'w')
     original = sys.stdout
     sys.stdout = Tee(sys.stdout, f)
+
+    args.added_layer_conf = handle_layer_conf_args(args.added_layer_conf)
+    if (args.added_layer_conf[0] != 0 and args.max_allowed_added_layers == 0) or (args.added_layer_conf[0] == 0 and args.max_allowed_added_layers != 0):
+        raise Exception(f"Arguments provided are incompatible. Please change either them:\n--added_layer_conf[0] => {args.added_layer_conf[0]}\n--max_allowed_added_layers => {args.max_allowed_added_layers}")
 
     # // 1.2 Main model //
     """
@@ -795,26 +807,22 @@ def create_directory_if_not_exists(directory_path):
         print(f"Directory '{directory_path}' already exists.")
 
 def overwrite_directory(directory_path):
-    """
-    Overwrite a directory by removing all existing files within it, if it exists.
-
-    Parameters:
-    directory_path (str): Path of the directory to be overwritten.
-    """
     if os.path.exists(directory_path):
         try:
-            # Remove all files and subdirectories within the directory
             shutil.rmtree(directory_path)
-            print(f"Existing directory '{directory_path}' and its contents removed successfully.")
         except OSError as err:
             print(f"Error: Unable to remove directory '{directory_path}' - {err}")
-
     try:
-        # Recreate the directory
         os.makedirs(directory_path)
         print(f"Directory '{directory_path}' created successfully.")
     except OSError as err:
         print(f"Error: Creating directory '{directory_path}' - {err}")
+
+def handle_layer_conf_args(layer_arg):
+    layer_arg = layer_arg.split(",")
+    for i in range(len(layer_arg)):
+        layer_arg[i] = int(layer_arg[i])
+    return layer_arg
 
 if __name__ == '__main__':
     main()

@@ -60,18 +60,25 @@ class MLP(nn.Module):
     def add_hidden_layer(self, layer_index, new_layer_size):
         if layer_index < 0 or layer_index >= len(self.layers):
             raise ValueError("Invalid layer_index")
-
+        # print("Layer index: ", layer_index)
+        # print("Layer new layer size: ", new_layer_size)
+        # print("Layers init: ", self.layers)
         prev_out_features = self.layers[layer_index].out_features
         next_in_features = self.layers[layer_index + 2].in_features
 
         new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
         self.layers.insert(layer_index + 2, new_layer)
         self.layers.insert(layer_index + 3, nn.ReLU())
+        # print("Layers after insert: ", self.layers)
+        # print("self.layers[layer_index + 3].in_features before", self.layers[layer_index + 3].in_features)
+        self.layers[layer_index + 4].in_features = new_layer_size
+        # print("Layers after in featues change insert: ", self.layers)
 
-        self.layers[layer_index + 3].in_features = new_layer_size
+        # if next_in_features != new_layer_size:
+        #     print("next_in_features != new_layer_size")
+        #     self.layers[layer_index + 4].in_features = new_layer_size
+        # print("Layers final: ", self.layers)
 
-        if next_in_features != new_layer_size:
-            self.layers[layer_index + 4].in_features = new_layer_size
 
 
 class Conv(nn.Module):
