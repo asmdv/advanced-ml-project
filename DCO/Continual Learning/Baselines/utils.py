@@ -14,17 +14,17 @@ from torchvision import datasets, transforms
 # from qpth.qp import QPFunction
 
 # ------- Visdom ------------
-def get_visdom(args):
+def get_visdom(args, experiment_name):
     vis = visdom.Visdom()
-    if args.rank == 0:
-        for env in vis.get_env_list():
-            vis.delete_env(env)
+    # if args.rank == 0:
+    #     for env in vis.get_env_list():
+    #         vis.delete_env(env)
     message = ''
     message += '----------------- Options ---------------\n'
     for k, v in sorted(vars(args).items()):
         message += '{:>25}: {:<30}<br>'.format(str(k), str(v))
     message += '----------------- End -------------------'
-    vis.text(message, win='information', env='gpu:%d'%args.rank)
+    vis.text(message, win='information', env=f'{experiment_name}')
     print('[Visdom] ===> Activated')
     return vis
 
