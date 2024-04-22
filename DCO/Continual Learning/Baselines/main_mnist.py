@@ -38,12 +38,12 @@ class Tee(object):
             f.flush()
 
 
-def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count, experiment_name):
+def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count):
     if not (added_layers_count < args.max_allowed_added_layers):
         return mod_main, added_layers_count
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
-
-    mod_local.freeze_all_but_last()
+    if args.freeze:
+        mod_local.freeze_all_but_last()
     mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
@@ -88,7 +88,8 @@ class ReplayBufferCL():
 def create_experiment_path(args):
     current_time = datetime.datetime.now()
     formatted_time = current_time.strftime("%Y-%m-%d_%H_%M_%S")
-    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_threshold_{args.cl_error_threshold}_max_layers_{args.max_allowed_added_layers}_{formatted_time}"
+    freeze_name = "freeze" if args.freeze else "no-freeze"
+    experiment_name = f"experiments/exp_{args.cl_dataset}_{args.cl_method}_n_tasks_{args.num_tasks}_epochs_{args.lr_epochs}_{args.cl_epochs}_threshold_{args.cl_error_threshold}_max_layers_{args.max_allowed_added_layers}_{freeze_name}_{formatted_time}"
     create_directory_if_not_exists(experiment_name)
     create_directory_if_not_exists(f"{experiment_name}/plots")
     return experiment_name
@@ -642,7 +643,7 @@ def main():
 
                 if adding_new_hidden_layer:
                     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args,
-                                                                                 model_conf, added_layers_count, experiment_name)
+                                                                                 model_conf, added_layers_count)
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
                         Fs = []
