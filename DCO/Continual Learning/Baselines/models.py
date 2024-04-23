@@ -58,7 +58,7 @@ class MLP(nn.Module):
             # print(f"{layer_i} ", end="")
             x = hidden_activation(hidden_layer(x))
         # print()
-        return self.output_layers[task](x)
+        return self.output_layers[self.tasks_output[task]](x)
 
     # def forward(self, x):
     #     x = x.view(x.size(0), -1)
