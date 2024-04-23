@@ -50,7 +50,8 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
 
     if args.added_layer_conf[1] == 0:
         args.added_layer_conf[1] = model_conf['s_layer']
-    mod_local.add_hidden_layerV2(len(mod_local.layers) - 3 - args.added_layer_conf[2] * 2, args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'])
+
+    mod_local.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'])
 
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
@@ -97,13 +98,13 @@ def main():
     torch.manual_seed(args.seed)  # https://pytorch.org/docs/stable/notes/randomness.html
     save_object = {"errors": [], "n_tasks": args.num_tasks}
 
+    rbcl = None
     if args.replay_buffer_batch_size:
         rbcl = ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size, batch_size=args.replay_buffer_batch_size)
 
     args.added_layer_conf = handle_layer_conf_args(args.added_layer_conf)
     if (args.added_layer_conf[0] != 0 and args.max_allowed_added_layers == 0) or (args.added_layer_conf[0] == 0 and args.max_allowed_added_layers != 0):
         raise Exception(f"Arguments provided are incompatible. Please change either them:\n--added_layer_conf[0] => {args.added_layer_conf[0]}\n--max_allowed_added_layers => {args.max_allowed_added_layers}")
-
     # Create experiment folder
     experiment_name = create_experiment_path(args)
 
@@ -113,7 +114,7 @@ def main():
     original = sys.stdout
     sys.stdout = Tee(sys.stdout, f)
 
-
+    print(f"Arguments: {args}")
     # // 1.2 Main model //
     """
         (1) by default the biases of all architectures are turned off.
@@ -226,7 +227,7 @@ def main():
         random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
         for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
             if batch_idx in random_replay_batch_ids:
-                train_utils.add_to_replay_buffer(rbcl, m_task, data, target, args)
+                train_utils.add_to_replay_buffer(rbcl, 1, data, target, args)
 
             cur_iteration += 1
             if args.cl_method == 'si' or args.cl_method == 'rwalk':
@@ -423,14 +424,14 @@ def main():
 
         # training
         cur_iteration = 0
+        samples = None
         for cl_epoch in range(args.cl_epochs):
             random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
                 if batch_idx in random_replay_batch_ids:
                     train_utils.add_to_replay_buffer(rbcl, m_task, data, target, args)
-
-                samples = train_utils.get_samples(rbcl, m_task)
+                    samples = train_utils.get_samples(rbcl, m_task)
 
                 cur_iteration += 1
                 if args.cl_method == 'sgd':
@@ -593,6 +594,7 @@ def main():
                 if adding_new_hidden_layer:
                     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args,
                                                                                  model_conf, added_layers_count)
+
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
                         Fs = []

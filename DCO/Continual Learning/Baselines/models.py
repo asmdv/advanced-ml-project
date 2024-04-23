@@ -11,7 +11,7 @@ from torch.autograd import Variable
 import utils
 
 class MLP(nn.Module):
-    def __init__(self, args, input_size, output_size, hidden_size=400, hidden_layer_num=2, is_bias=False):
+    def __init__(self, args, input_size, output_size, hidden_size=400, hidden_layer_num=2, is_bias=False, num_tasks=5):
         super().__init__()
         """ Fully-connected neural network
 
@@ -22,17 +22,40 @@ class MLP(nn.Module):
           there is a critical modification towards the original implementation 
           should never do thing like [nn.Linear* 10] as these linear layers are going to be identical
         """
-        hidden_layers = [[nn.Linear(hidden_size, hidden_size, bias=is_bias), nn.ReLU()] for _ in range(hidden_layer_num)]
-        hidden_layers = itertools.chain.from_iterable(hidden_layers)
-        self.layers = nn.ModuleList([
-            nn.Linear(input_size, hidden_size, bias=is_bias), nn.ReLU(),
-            *hidden_layers,
-            nn.Linear(hidden_size, output_size, bias=is_bias)
+        # hidden_layers = [[nn.Linear(hidden_size, hidden_size, bias=is_bias), nn.ReLU()] for _ in range(hidden_layer_num)]
+        # hidden_layers = itertools.chain.from_iterable(hidden_layers)
+        # self.layers = nn.ModuleList([
+        #     nn.Linear(input_size, hidden_size, bias=is_bias), nn.ReLU(),
+        #     *hidden_layers,
+        #     nn.Linear(hidden_size, output_size, bias=is_bias)
+        # ])
+
+        self.input_layer = nn.Linear(input_size, hidden_size, bias=is_bias)
+        self.input_activation = nn.ReLU()
+
+        self.hidden_layers = nn.ModuleList([
+            nn.Linear(hidden_size, hidden_size, bias=is_bias) for _ in range(hidden_layer_num)
+        ])
+        self.hidden_activations = nn.ModuleList([
+            nn.ReLU() for _ in range(hidden_layer_num)
         ])
 
-    def forward(self, x):
+        self.output_layer = nn.Linear(hidden_size, output_size, bias=is_bias)
+
+        self.tasks = [len(self.hidden_layers) - 1] * num_tasks
+
+    def forward(self, x, task=None):
         x = x.view(x.size(0), -1)
-        return reduce(lambda x, l: l(x), self.layers, x)
+        x = self.input_activation(self.input_layer(x))
+        for layer_i, (hidden_layer, hidden_activation) in enumerate(zip(self.hidden_layers, self.hidden_activations)):
+            if task and layer_i == self.tasks[task] + 1:
+                break
+            x = hidden_activation(hidden_layer(x))
+        return self.output_layer(x)
+
+    # def forward(self, x):
+    #     x = x.view(x.size(0), -1)
+    #     return reduce(lambda x, l: l(x), self.layers, x)
 
     def pull2point(self, point, pull_strength=0.1):
         assert pull_strength ** 2 < 1
@@ -57,6 +80,36 @@ class MLP(nn.Module):
             param.requires_grad = False
         print(f"All layers except the last one frozen successfully.")
 
+    def add_hidden_layerV3(self, new_layer_size, count=1, same=False):
+        # if layer_index < 0 or layer_index >= len(self.layers):
+        #     raise ValueError("Invalid layer_index")
+        if count < 1:
+            raise ValueError("Count should be at least 1")
+
+        prev_out_features = self.hidden_layers[-1].out_features
+        next_in_features = self.output_layer.in_features
+        print(f"New Hidden Layer is the same as others: {same}")
+        if not same:
+            if count == 1:
+                raise Exception(f"Cannot add only 1 layer with different hidden size: {new_layer_size}. Try at least 2.")
+            new_layer_before = nn.Linear(prev_out_features, new_layer_size, bias=False)
+            new_layer_after = nn.Linear(new_layer_size, next_in_features, bias=False)
+            new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
+
+            self.hidden_layers.insert(len(self.hidden_layers), new_layer_before)
+            self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+
+            for i in range(count-2):
+                self.hidden_layers.insert(len(self.hidden_layers), new_layer)
+                self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+
+            self.hidden_layers.insert(len(self.hidden_layers), new_layer_after)
+            self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+        else:
+            for i in range(count):
+                new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
+                self.hidden_layers.insert(len(self.hidden_layers), new_layer)
+                self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
 
     def add_hidden_layerV2(self, layer_index, new_layer_size, count=1, same=False):
         if layer_index < 0 or layer_index >= len(self.layers):

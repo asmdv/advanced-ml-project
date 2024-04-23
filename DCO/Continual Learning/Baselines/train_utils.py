@@ -74,7 +74,7 @@ def add_to_replay_buffer(rbcl, m_task, data, target, args):
             batch_size=[args.train_batch_size],
         )
         rbcl.buffer[m_task - 1].extend(replayBufferData)
-
+    return rbcl
 def get_random_replay_batch_ids(start, end, args):
     random_replay_batch_id = []
 
