@@ -52,9 +52,9 @@ class MLP(nn.Module):
         for layer_i, (hidden_layer, hidden_activation) in enumerate(zip(self.hidden_layers, self.hidden_activations)):
             if task != None and layer_i == self.tasks[task] + 1:
                 break
-            print(f"{layer_i} ", end="")
+            # print(f"{layer_i} ", end="")
             x = hidden_activation(hidden_layer(x))
-        print()
+        # print()
         return self.output_layer(x)
 
     # def forward(self, x):
