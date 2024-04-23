@@ -41,7 +41,7 @@ class Tee(object):
             f.flush()
 
 
-def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count):
+def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count, m_task):
     if not (added_layers_count < args.max_allowed_added_layers):
         return mod_main, added_layers_count
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
@@ -53,6 +53,10 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
 
     mod_local.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'])
 
+    for i in range(m_task - 1, len(mod_main.tasks)):
+        mod_main.tasks[i] += 1
+
+    print("Current mod_main tasks: ", mod_main.tasks)
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     mod_main = mod_main.to(args.device)
@@ -232,7 +236,7 @@ def main():
             cur_iteration += 1
             if args.cl_method == 'si' or args.cl_method == 'rwalk':
                 param1 = utils.ravel_model_params(mod_main, False, 'cpu')
-                main_loss = trainer.train(args, mod_main, opt_main, data, target)
+                main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
                 main_loss.backward()
                 grad = utils.ravel_model_params(mod_main, True, 'cpu')  # 'plain' gradients without regularization
                 opt_main.step()
@@ -260,14 +264,15 @@ def main():
                         # 4. reset small omega to zero
                         small_omega = 0
             else:
-                main_loss = trainer.train(args, mod_main, opt_main, data, target)
+                main_loss = trainer.train(args, mod_main, opt_main, data, target, task=0)
                 main_loss.backward()
                 opt_main.step()
+
         opt_main_scheduler.step()
         if epoch % log_interval == 0:
             errors = []
             for i in range(1, args.num_tasks + 1):
-                cur_error = trainer.test(args, mod_main, te_loaders[i], i, global_epoch + epoch)
+                cur_error = trainer.test(args, mod_main, te_loaders[i], i, global_epoch + epoch, task=i-1)
                 errors += [cur_error]
                 visdom_obj.line([cur_error], [global_epoch + epoch], update='append',
                                 opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i, name='T',
@@ -424,28 +429,27 @@ def main():
 
         # training
         cur_iteration = 0
-        samples = None
         for cl_epoch in range(args.cl_epochs):
             random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
                 if batch_idx in random_replay_batch_ids:
                     train_utils.add_to_replay_buffer(rbcl, m_task, data, target, args)
-                    samples = train_utils.get_samples(rbcl, m_task)
+                samples = train_utils.get_samples(rbcl, m_task, args)
 
                 cur_iteration += 1
                 if args.cl_method == 'sgd':
-                    train_utils.train_sgd_cl(args, mod_main, opt_main, data, target)
+                    train_utils.train_sgd_cl(args, mod_main, opt_main, data, target, task=m_task-1)
                     train_utils.train_sgd_cl_replay(samples, args, mod_main, opt_main)
 
                 elif args.cl_method == 'ewc':
-                    train_utils.train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs)
+                    train_utils.train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs, task=m_task-1)
                     train_utils.train_ewc_cl_replay(samples, args, mod_main, opt_main, mod_main_centers, Fs)
 
                 elif args.cl_method == 'si':
                     """ SI algorithm adds per-parameter regularization loss to the total loss """
                     param1 = utils.ravel_model_params(mod_main, False, 'cpu')
-                    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+                    main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
                     main_loss.backward()
                     grad = utils.ravel_model_params(mod_main, True, 'cpu')
                     loss, cur_p = 0, 0
@@ -465,7 +469,7 @@ def main():
                             (2) updates: the updates of running fisher etc. should be the same as before. Don't forget to check '+=' for big_omegas
                     """
                     param1 = utils.ravel_model_params(mod_main, False, 'cpu')
-                    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+                    main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
                     main_loss.backward()
                     grad = utils.ravel_model_params(mod_main, True, 'cpu')
                     loss, cur_p = 0, 0
@@ -506,7 +510,7 @@ def main():
                             (2) Update of GEM  : it solves a quadratic programming problem with `quadprog`, a cpu-based pyhton library, for every iteration.
                                                  Thus GEM may be intractable for deep neural networks.
                     """
-                    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+                    main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
                     main_loss.backward()
                     m_grad = utils.ravel_model_params(mod_main, True, args.device)
                     mod_main.zero_grad()
@@ -514,7 +518,7 @@ def main():
                         agem_iter = agem_loader.__iter__()
                         agem_data, agem_target = next(agem_iter)
                         agem_target = agem_target.view(-1)
-                        main_loss = trainer.train(args, mod_main, opt_main, agem_data, agem_target)
+                        main_loss = trainer.train(args, mod_main, opt_main, agem_data, agem_target, task=m_task-1)
                         main_loss.backward()
                         gem_grad = utils.ravel_model_params(mod_main, True, args.device)
                         mod_main.zero_grad()
@@ -526,7 +530,7 @@ def main():
                         t1 = time.time()
                         for gem_data, gem_target in agem_loader:
                             gem_target = gem_target.view(-1)
-                            main_loss = trainer.train(args, mod_main, opt_main, gem_data, gem_target)
+                            main_loss = trainer.train(args, mod_main, opt_main, gem_data, gem_target, task=m_task-1)
                             main_loss.backward()
                             gem_grad += [utils.ravel_model_params(mod_main, True, args.device)]
                             mod_main.zero_grad()
@@ -539,17 +543,20 @@ def main():
                     utils.assign_model_params(m_grad, mod_main, True)
                     opt_main.step()
                 elif args.cl_method == 'dco':
-                    ae_loss, grad_norm = train_utils.train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+                    ae_loss, grad_norm = train_utils.train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes, task=m_task-1)
                     ae_loss, grad_norm = train_utils.train_dco_cl_replay(samples, args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
                     # for i in range(1, m_task):
                     #     _, _, diff = mod_main.module.pull2point(mod_main_centers[i], pull_strength=args.ae_offline_ps) # pull to the center variavle
                 else:
                     raise ValueError('No named method')
             if cl_epoch % log_interval == 0:
+                print("All grad params")
+                mod_main.print_grad_req_for_all_params()
+
                 errors = []
                 for i in range(1, args.num_tasks + 1):
                     cur_error = trainer.test(args, mod_main, te_loaders[i], i,
-                                             global_epoch + (m_task - 1) * args.cl_epochs + (cl_epoch + 1))
+                                             global_epoch + (m_task - 1) * args.cl_epochs + (cl_epoch + 1), task=i-1)
                     errors += [cur_error]
                     visdom_obj.line([cur_error], [global_epoch + (m_task - 1) * args.cl_epochs + (cl_epoch + 1)],
                                     update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
@@ -593,7 +600,7 @@ def main():
 
                 if adding_new_hidden_layer:
                     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args,
-                                                                                 model_conf, added_layers_count)
+                                                                                     model_conf, added_layers_count, m_task)
 
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
@@ -624,7 +631,7 @@ def main():
     errors = []
     for i in range(1, args.num_tasks + 1):
         cur_error = trainer.test(args, mod_main, te_loaders[i], i,
-                                 global_epoch + (args.num_tasks) * args.cl_epochs + 1)
+                                 global_epoch + (args.num_tasks) * args.cl_epochs + 1, task=i-1)
         errors += [cur_error]
         visdom_obj.line([cur_error], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
                         update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
@@ -729,7 +736,7 @@ def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, a
     for param in mod_main.parameters():
         ewc_grads += [torch.zeros_like(param)]
     for num, (data, target) in enumerate(ewc_loader, 1):
-        main_loss = trainer.train(args, mod_main, opt_main, data, target)
+        main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
         main_loss.backward()
         for param, grad in zip(mod_main.parameters(), ewc_grads):
             if param.grad is not None:
@@ -762,7 +769,7 @@ def upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, 
     corner2 = corner1.clone()
     for ep in range(args.prox_epochs):
         for batch_idx, (data, target) in enumerate(tr_loaders[m_task - 1], 1):
-            main_loss = trainer.train(args, mod_main, opt_main, data, target)
+            main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
             main_loss.backward()
             opt_main.step()
             if ep == 0 and batch_idx <= 16:

@@ -5,7 +5,7 @@ import pdb
 OKGREEN = '\033[92m'
 ENDC = '\033[0m'
 
-def train(args, mod_main, opt_main, data, target, is_grad_acc = False):
+def train(args, mod_main, opt_main, data, target, task=None, is_grad_acc = False):
     '''
         is_grad_acc:    by default we clean up the gradients of classifer
                         but we hope to accumulate the gradients for our method
@@ -22,13 +22,13 @@ def train(args, mod_main, opt_main, data, target, is_grad_acc = False):
         opt_main.zero_grad()
     if args.cl_dataset == 'permuted_mnist':
         data, target = data.to(args.device), target.to(args.device)
-        output = mod_main(data)
+        output = mod_main(data, task=task)
         main_loss = F.cross_entropy(output, target)
     elif args.cl_dataset == 'split_mnist' or args.cl_dataset == 'split_cifar10':
         main_loss = 0
         data, target = data.to(args.device), target.to(args.device)
         task_target = target % 2
-        output = mod_main(data)
+        output = mod_main(data, task=task)
         for i in range(target.size(0)):
             output_id = 2* (target[i].item()//2)
             main_loss += F.cross_entropy(output[i:i+1, output_id:output_id+2], task_target[i].view(-1), reduction='sum')
@@ -37,7 +37,7 @@ def train(args, mod_main, opt_main, data, target, is_grad_acc = False):
         main_loss = 0
         data, target = data.to(args.device), target.to(args.device)
         task_target = target % 10
-        output = mod_main(data)
+        output = mod_main(data, task=task)
         if 'gem' in args.cl_method:
             for i in range(target.size(0)):
                 output_id = 10* (target[i].item()//10)
@@ -48,11 +48,11 @@ def train(args, mod_main, opt_main, data, target, is_grad_acc = False):
         main_loss = main_loss / target.size(0)
     elif args.cl_dataset == 'from_fashion_mnist' or args.cl_dataset == 'to_fashion_mnist':
         data, target = data.to(args.device), target.to(args.device)
-        output = mod_main(data)
+        output = mod_main(data, task=task)
         main_loss = F.cross_entropy(output, target)
     return main_loss
 
-def test(args, model, test_loader, task_num, epoch, prefix=''):
+def test(args, model, test_loader, task_num, epoch, prefix='', task=None):
     '''
         Be careful about the multi-head setup for both loss and error
     '''
@@ -62,14 +62,14 @@ def test(args, model, test_loader, task_num, epoch, prefix=''):
         for data, target in test_loader:
             if args.cl_dataset == 'permuted_mnist':
                 data, target = data.to(args.device), target.to(args.device)
-                output = model(data)
+                output = model(data, task)
                 test_loss += F.cross_entropy(output, target, reduction='sum').item()
                 pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
             elif args.cl_dataset == 'split_mnist' or args.cl_dataset == 'split_cifar10':
                 data, target = data.to(args.device), target.to(args.device)
                 task_target = target % 2
-                output = model(data)
+                output = model(data, task)
                 for i in range(target.size(0)):
                     output_id = 2* (target[i].item()//2)
                     test_loss += F.cross_entropy(output[i:i+1, output_id:output_id+2], task_target[i].view(-1), reduction='sum').item()
@@ -79,7 +79,7 @@ def test(args, model, test_loader, task_num, epoch, prefix=''):
                 data, target = data.to(args.device), target.to(args.device)
                 # print(target)
                 task_target = target % 10
-                output = model(data)
+                output = model(data, task)
                 if 'gem' in args.cl_method:
                     for i in range(target.size(0)):
                         output_id = 10* (target[i].item()//10)
@@ -93,7 +93,7 @@ def test(args, model, test_loader, task_num, epoch, prefix=''):
                     correct += pred.eq(task_target.view_as(pred)).sum().item()
             elif args.cl_dataset == 'from_fashion_mnist' or args.cl_dataset == 'to_fashion_mnist':
                 data, target = data.to(args.device), target.to(args.device)
-                output = model(data)
+                output = model(data, task)
                 test_loss += F.cross_entropy(output, target, reduction='sum').item()
                 pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()

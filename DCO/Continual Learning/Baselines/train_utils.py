@@ -8,14 +8,16 @@ class ReplayBufferData:
     images: torch.Tensor
     labels: torch.Tensor
 
-def get_samples(rbcl, m_task):
+def get_samples(rbcl, m_task, args):
+    if not args.replay_buffer_batch_size:
+        return None
     samples = []
     for task_i in range(m_task - 1):
         samples.append(rbcl.buffer[task_i].sample())
     return samples
 
-def train_sgd_cl(args, mod_main, opt_main, data, target):
-    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+def train_sgd_cl(args, mod_main, opt_main, data, target, task):
+    main_loss = trainer.train(args, mod_main, opt_main, data, target, task)
     main_loss.backward()
     opt_main.step()
 
@@ -23,29 +25,29 @@ def train_sgd_cl_replay(samples, args, mod_main, opt_main):
     if not args.replay_buffer_batch_size:
         return
     for task_i, sample in enumerate(samples):
-        train_sgd_cl(args, mod_main, opt_main, sample.images, sample.labels)
+        train_sgd_cl(args, mod_main, opt_main, sample.images, sample.labels, task_i)
 
 
-def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs):
+def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs, task):
     """ For each task we save a seperate Fisher matrix and a set of optimal parameters. """
     ewc_loss = 0
-    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+    main_loss = trainer.train(args, mod_main, opt_main, data, target, task=task)
     for mod_main_center, F_grad in zip(mod_main_centers, Fs):
         for p1, p2, coe in zip(mod_main.parameters(), mod_main_center, F_grad):
             ewc_loss += 1 / 2 * args.ewc_lam * (coe * F.mse_loss(p1, p2, reduction='none')).sum()
     (main_loss + ewc_loss).backward()
     opt_main.step()
 
-def train_ewc_cl_replay(samples, args, mod_main, opt_main, mod_main_centers, Fs):
+def train_ewc_cl_replay(samples, args, mod_main, opt_main, mod_main_centers, Fs, task):
     if not args.replay_buffer_batch_size:
         return
     for task_i, sample in enumerate(samples):
-        train_ewc_cl(args, mod_main, opt_main, sample.images, sample.labels, mod_main_centers, Fs)
+        train_ewc_cl(args, mod_main, opt_main, sample.images, sample.labels, mod_main_centers, Fs, task_i)
 
 
 
-def train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes):
-    main_loss = trainer.train(args, mod_main, opt_main, data, target)
+def train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes, task):
+    main_loss = trainer.train(args, mod_main, opt_main, data, target, task=task)
     ae_loss = []
     for i in range(1, m_task):
         ae_loss += [
@@ -62,7 +64,7 @@ def train_dco_cl_replay(samples, args, mod_main, opt_main, data, target, m_task,
     if not args.replay_buffer_batch_size:
         return
     for task_i, sample in enumerate(samples):
-        ae_loss, grad_norm = train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+        ae_loss, grad_norm = train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes, task=task_i)
     return ae_loss, grad_norm
 
 
