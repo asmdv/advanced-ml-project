@@ -48,7 +48,7 @@ class MLP(nn.Module):
         # print(f"Forward task {task}")
         x = x.view(x.size(0), -1)
         x = self.input_activation(self.input_layer(x))
-        print(f"Layers executed for Task {task}: ", end="")
+        # print(f"Layers executed for Task {task}: ", end="")
         for layer_i, (hidden_layer, hidden_activation) in enumerate(zip(self.hidden_layers, self.hidden_activations)):
             if task != None and layer_i == self.tasks[task] + 1:
                 break
