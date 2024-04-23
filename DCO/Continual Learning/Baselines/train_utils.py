@@ -40,7 +40,7 @@ def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs, t
     (main_loss + ewc_loss).backward()
     opt_main.step()
 
-def train_ewc_cl_replay(samples, args, mod_main, opt_main, mod_main_centers, Fs, task):
+def train_ewc_cl_replay(samples, args, mod_main, opt_main, mod_main_centers, Fs):
     if not args.replay_buffer_batch_size:
         return
     for task_i, sample in enumerate(samples):
