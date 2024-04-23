@@ -40,9 +40,12 @@ class MLP(nn.Module):
             nn.ReLU() for _ in range(hidden_layer_num)
         ])
 
-        self.output_layer = nn.Linear(hidden_size, output_size, bias=is_bias)
+        self.output_layers = nn.ModuleList([
+            nn.Linear(hidden_size, output_size, bias=is_bias)
+        ])
 
         self.tasks = [len(self.hidden_layers) - 1] * num_tasks
+        self.tasks_output = [0] * num_tasks
 
     def forward(self, x, task):
         # print(f"Forward task {task}")
@@ -55,7 +58,7 @@ class MLP(nn.Module):
             # print(f"{layer_i} ", end="")
             x = hidden_activation(hidden_layer(x))
         # print()
-        return self.output_layer(x)
+        return self.output_layers[task](x)
 
     # def forward(self, x):
     #     x = x.view(x.size(0), -1)
@@ -84,36 +87,83 @@ class MLP(nn.Module):
             param.requires_grad = False
         print(f"All layers except the last one frozen successfully.")
 
-    def add_hidden_layerV3(self, new_layer_size, count=1, same=False):
+    def add_hidden_layerV3(self, new_layer_size, task, count=1, same=False):
         # if layer_index < 0 or layer_index >= len(self.layers):
         #     raise ValueError("Invalid layer_index")
         if count < 1:
             raise ValueError("Count should be at least 1")
 
         prev_out_features = self.hidden_layers[-1].out_features
-        next_in_features = self.output_layer.in_features
+        next_in_features = self.output_layers.in_features
         print(f"New Hidden Layer is the same as others: {same}")
-        if not same:
-            if count == 1:
-                raise Exception(f"Cannot add only 1 layer with different hidden size: {new_layer_size}. Try at least 2.")
-            new_layer_before = nn.Linear(prev_out_features, new_layer_size, bias=False)
-            new_layer_after = nn.Linear(new_layer_size, next_in_features, bias=False)
-            new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
 
-            self.hidden_layers.insert(len(self.hidden_layers), new_layer_before)
-            self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+        for i in range(task - 1, len(self.tasks)):
+            self.tasks[i] += 1
+
+        if count == 1:
+            output_layer = nn.Linear(prev_out_features, self.output_layers[-1].out_features, bias=False)
+            self.output_layers.append(output_layer)
+            for i in range(task - 1, len(self.tasks)):
+                self.tasks_output[i] += 1
+
+
+        elif count == 2:
+            new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
+            self.hidden_layers.append(new_layer)
+            self.hidden_activations.append(nn.ReLU())
+            for i in range(task - 1, len(self.tasks)):
+                self.tasks[i] += 1
+
+            output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
+            self.output_layers.append(output_layer)
+            for i in range(task - 1, len(self.tasks)):
+                self.tasks_output[i] += 1
+
+
+        elif count > 2:
+            before_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
+            self.hidden_layers.append(before_layer)
+            self.hidden_activations.append(nn.ReLU())
+            for i in range(task - 1, len(self.tasks)):
+                self.tasks[i] += 1
 
             for i in range(count-2):
-                self.hidden_layers.insert(len(self.hidden_layers), new_layer)
-                self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
-
-            self.hidden_layers.insert(len(self.hidden_layers), new_layer_after)
-            self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
-        else:
-            for i in range(count):
                 new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
-                self.hidden_layers.insert(len(self.hidden_layers), new_layer)
-                self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+                self.hidden_layers.append(new_layer)
+                self.hidden_activations.append(nn.ReLU())
+                for i in range(task - 1, len(self.tasks)):
+                    self.tasks[i] += 1
+
+            output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
+            self.output_layers.append(output_layer)
+            for i in range(task - 1, len(self.tasks)):
+                self.tasks_output[i] += 1
+
+        else:
+            raise Exception("Invalid count format")
+
+        # if not same:
+        #     if count == 1:
+        #         raise Exception(f"Cannot add only 1 layer with different hidden size: {new_layer_size}. Try at least 2.")
+        #     new_layer_before = nn.Linear(prev_out_features, new_layer_size, bias=False)
+        #     new_layer_after = nn.Linear(new_layer_size, next_in_features, bias=False)
+        #     new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
+        #
+        #     self.hidden_layers.insert(len(self.hidden_layers), new_layer_before)
+        #     self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+        #
+        #     for i in range(count-2):
+        #         self.hidden_layers.insert(len(self.hidden_layers), new_layer)
+        #         self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+        #
+        #     self.hidden_layers.insert(len(self.hidden_layers), new_layer_after)
+        #     self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+        # else:
+        #     for i in range(count-1):
+        #         new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
+        #         self.hidden_layers.insert(len(self.hidden_layers), new_layer)
+        #         self.hidden_activations.insert(len(self.hidden_activations), nn.ReLU())
+        #     self.output_layer.append(nn.Linear)
 
     def add_hidden_layerV2(self, layer_index, new_layer_size, count=1, same=False):
         if layer_index < 0 or layer_index >= len(self.layers):

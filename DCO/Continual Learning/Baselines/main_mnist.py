@@ -51,10 +51,8 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     if args.added_layer_conf[1] == 0:
         args.added_layer_conf[1] = model_conf['s_layer']
 
-    mod_local.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'])
+    mod_local.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'], task=m_task)
 
-    for i in range(m_task - 1, len(mod_main.tasks)):
-        mod_main.tasks[i] += 1
 
     print("Current mod_main tasks: ", mod_main.tasks)
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])

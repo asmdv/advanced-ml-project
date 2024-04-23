@@ -3,6 +3,8 @@ import torch
 from tensordict import tensorclass
 import random
 import math
+import torch.nn.functional as F
+
 @tensorclass
 class ReplayBufferData:
     images: torch.Tensor

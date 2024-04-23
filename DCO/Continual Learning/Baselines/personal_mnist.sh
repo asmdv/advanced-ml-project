@@ -3,7 +3,69 @@
 # Permuted Mnist
 
 ## SGD (0 added layers)
+### No replay
 python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0
+### Replay 5
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 5
+
+### Replay 20
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 20
+
+### Replay 40
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 40
+
+### Replay 128
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 128
+
+# EWC
+### No replay
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset permuted_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0
+
+### Replay 5
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset permuted_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0 --replay_buffer_batch_size 5
+
+### Replay 20
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset permuted_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0 --replay_buffer_batch_size 20
+
+### Replay 128
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset permuted_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0 --replay_buffer_batch_size 128
+
+
+
+# Split Mnist
+## SGD
+### No replay
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0
+### Replay 5
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 5
+
+### Replay 20
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 20
+
+### Replay 40
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 40
+
+### Replay 128
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 128
+
+
+## EWC
+
+
+
+## EWC (0 added layers)
+### No replay
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset split_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0
+
+### Replay 5
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset split_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0 --replay_buffer_batch_size 5
+
+### Replay 20
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset split_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0 --replay_buffer_batch_size 20
+
+### Replay 128
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-3 --train-batch-size 128 --wd 1e-3 --cl_method 'ewc' --num_tasks 5 --ewc_lam 10  --cl_dataset split_mnist --rank 0 --cl_error_threshold 8 --max_allowed_added_layers 0 --replay_buffer_batch_size 128
+
 
 ## SGD (1 added layers)
 
@@ -60,5 +122,5 @@ python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --mai
 
 
 
-python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 2048
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 20
 
