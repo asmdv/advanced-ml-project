@@ -228,7 +228,7 @@ def main():
 
     cur_iteration = 0
     for epoch in range(1, args.lr_epochs + 1):
-        random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
+        random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 1, args)
         for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
             if batch_idx in random_replay_batch_ids:
                 train_utils.add_to_replay_buffer(rbcl, 1, data, target, args)
@@ -430,7 +430,7 @@ def main():
         # training
         cur_iteration = 0
         for cl_epoch in range(args.cl_epochs):
-            random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]), args)
+            random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 1, args)
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
                 if batch_idx in random_replay_batch_ids:
@@ -550,9 +550,6 @@ def main():
                 else:
                     raise ValueError('No named method')
             if cl_epoch % log_interval == 0:
-                print("All grad params")
-                mod_main.print_grad_req_for_all_params()
-
                 errors = []
                 for i in range(1, args.num_tasks + 1):
                     cur_error = trainer.test(args, mod_main, te_loaders[i], i,
