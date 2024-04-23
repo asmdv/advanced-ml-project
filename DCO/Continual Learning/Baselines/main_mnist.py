@@ -45,14 +45,20 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     if not (added_layers_count < args.max_allowed_added_layers):
         return mod_main, added_layers_count
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
+    print("Before freeeze:")
+    mod_local.print_grad_req_for_all_params()
     if args.freeze:
         mod_local.freeze_all_but_last()
+    print("After freeeze:")
+    mod_local.print_grad_req_for_all_params()
 
     if args.added_layer_conf[1] == 0:
         args.added_layer_conf[1] = model_conf['s_layer']
 
     mod_local.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'], task=m_task)
-
+    print("Output layer mod local", mod_local.output_layers)
+    print("After addition:")
+    mod_local.print_grad_req_for_all_params()
 
     print("Current mod_main tasks: ", mod_main.tasks)
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
@@ -428,7 +434,7 @@ def main():
         # training
         cur_iteration = 0
         for cl_epoch in range(args.cl_epochs):
-            random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 1, args)
+            random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 5, args)
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
                 # Adding replay buffer
                 if batch_idx in random_replay_batch_ids:
@@ -547,6 +553,7 @@ def main():
                     #     _, _, diff = mod_main.module.pull2point(mod_main_centers[i], pull_strength=args.ae_offline_ps) # pull to the center variavle
                 else:
                     raise ValueError('No named method')
+
             if cl_epoch % log_interval == 0:
                 errors = []
                 for i in range(1, args.num_tasks + 1):
@@ -731,7 +738,7 @@ def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, a
     for param in mod_main.parameters():
         ewc_grads += [torch.zeros_like(param)]
     for num, (data, target) in enumerate(ewc_loader, 1):
-        main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task-1)
+        main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task - 1)
         main_loss.backward()
         for param, grad in zip(mod_main.parameters(), ewc_grads):
             if param.grad is not None:

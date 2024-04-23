@@ -41,10 +41,14 @@ class MLP(nn.Module):
         ])
 
         self.output_layers = nn.ModuleList([
+            nn.Linear(hidden_size, output_size, bias=is_bias),
+            nn.Linear(hidden_size, output_size, bias=is_bias),
+            nn.Linear(hidden_size, output_size, bias=is_bias),
+            nn.Linear(hidden_size, output_size, bias=is_bias),
             nn.Linear(hidden_size, output_size, bias=is_bias)
         ])
 
-        self.tasks = [len(self.hidden_layers) - 1] * num_tasks
+        self.tasks = [hidden_layer_num - 1] * num_tasks
         self.tasks_output = [0] * num_tasks
 
     def forward(self, x, task):
@@ -83,9 +87,10 @@ class MLP(nn.Module):
             print(name, param.requires_grad)
     def freeze_all_but_last(model):
         t = tuple(model.named_parameters())
-        for name, param in t[:-1]:
-            param.requires_grad = False
-        print(f"All layers except the last one frozen successfully.")
+        for name, param in t:
+            if not ("output" in name):
+                param.requires_grad = False
+        print(f"All layers except the outputs frozen successfully.")
 
     def add_hidden_layerV3(self, new_layer_size, task, count=1, same=False):
         # if layer_index < 0 or layer_index >= len(self.layers):
@@ -94,18 +99,16 @@ class MLP(nn.Module):
             raise ValueError("Count should be at least 1")
 
         prev_out_features = self.hidden_layers[-1].out_features
-        next_in_features = self.output_layers.in_features
-        print(f"New Hidden Layer is the same as others: {same}")
 
         for i in range(task - 1, len(self.tasks)):
             self.tasks[i] += 1
 
         if count == 1:
-            output_layer = nn.Linear(prev_out_features, self.output_layers[-1].out_features, bias=False)
-            self.output_layers.append(output_layer)
+            # output_layer = nn.Linear(prev_out_features, self.output_layers[-1].out_features, bias=False)
+            # self.output_layers.append(output_layer)
             for i in range(task - 1, len(self.tasks)):
                 self.tasks_output[i] += 1
-
+            pass
 
         elif count == 2:
             new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
@@ -114,8 +117,8 @@ class MLP(nn.Module):
             for i in range(task - 1, len(self.tasks)):
                 self.tasks[i] += 1
 
-            output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
-            self.output_layers.append(output_layer)
+            # output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
+            # self.output_layers.append(output_layer)
             for i in range(task - 1, len(self.tasks)):
                 self.tasks_output[i] += 1
 
@@ -134,8 +137,8 @@ class MLP(nn.Module):
                 for i in range(task - 1, len(self.tasks)):
                     self.tasks[i] += 1
 
-            output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
-            self.output_layers.append(output_layer)
+            # output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
+            # self.output_layers.append(output_layer)
             for i in range(task - 1, len(self.tasks)):
                 self.tasks_output[i] += 1
 

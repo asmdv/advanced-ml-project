@@ -5,7 +5,7 @@ import pdb
 OKGREEN = '\033[92m'
 ENDC = '\033[0m'
 
-def train(args, mod_main, opt_main, data, target, task=None, is_grad_acc = False):
+def train(args, mod_main, opt_main, data, target, task, is_grad_acc = False):
     '''
         is_grad_acc:    by default we clean up the gradients of classifer
                         but we hope to accumulate the gradients for our method
@@ -52,7 +52,7 @@ def train(args, mod_main, opt_main, data, target, task=None, is_grad_acc = False
         main_loss = F.cross_entropy(output, target)
     return main_loss
 
-def test(args, model, test_loader, task_num, epoch, prefix='', task=None):
+def test(args, model, test_loader, task_num, epoch, task, prefix=''):
     '''
         Be careful about the multi-head setup for both loss and error
     '''
