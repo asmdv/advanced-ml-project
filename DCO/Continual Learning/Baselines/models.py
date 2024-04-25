@@ -85,10 +85,13 @@ class MLP(nn.Module):
         print("Printing all params")
         for name, param in self.named_parameters():
             print(name, param.requires_grad)
-    def freeze_all_but_last(model):
+    def freeze_all_but_last(model, task):
         t = tuple(model.named_parameters())
         for name, param in t:
-            if not ("output" in name):
+            if "output" in name:
+                if int(name.split(".")[1]) == task-1:
+                    param.requires_grad = False
+            else:
                 param.requires_grad = False
         print(f"All layers except the outputs frozen successfully.")
 
@@ -100,13 +103,13 @@ class MLP(nn.Module):
 
         prev_out_features = self.hidden_layers[-1].out_features
 
-        for i in range(task - 1, len(self.tasks)):
+        for i in range(task, len(self.tasks)):
             self.tasks[i] += 1
 
         if count == 1:
             # output_layer = nn.Linear(prev_out_features, self.output_layers[-1].out_features, bias=False)
             # self.output_layers.append(output_layer)
-            for i in range(task - 1, len(self.tasks)):
+            for i in range(task, len(self.tasks)):
                 self.tasks_output[i] += 1
             pass
 
@@ -114,12 +117,12 @@ class MLP(nn.Module):
             new_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
             self.hidden_layers.append(new_layer)
             self.hidden_activations.append(nn.ReLU())
-            for i in range(task - 1, len(self.tasks)):
+            for i in range(task, len(self.tasks)):
                 self.tasks[i] += 1
 
             # output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
             # self.output_layers.append(output_layer)
-            for i in range(task - 1, len(self.tasks)):
+            for i in range(task, len(self.tasks)):
                 self.tasks_output[i] += 1
 
 
@@ -127,19 +130,19 @@ class MLP(nn.Module):
             before_layer = nn.Linear(prev_out_features, new_layer_size, bias=False)
             self.hidden_layers.append(before_layer)
             self.hidden_activations.append(nn.ReLU())
-            for i in range(task - 1, len(self.tasks)):
+            for i in range(task, len(self.tasks)):
                 self.tasks[i] += 1
 
             for i in range(count-2):
                 new_layer = nn.Linear(new_layer_size, new_layer_size, bias=False)
                 self.hidden_layers.append(new_layer)
                 self.hidden_activations.append(nn.ReLU())
-                for i in range(task - 1, len(self.tasks)):
+                for i in range(task, len(self.tasks)):
                     self.tasks[i] += 1
 
             # output_layer = nn.Linear(new_layer_size, self.output_layers[-1].out_features, bias=False)
             # self.output_layers.append(output_layer)
-            for i in range(task - 1, len(self.tasks)):
+            for i in range(task, len(self.tasks)):
                 self.tasks_output[i] += 1
 
         else:

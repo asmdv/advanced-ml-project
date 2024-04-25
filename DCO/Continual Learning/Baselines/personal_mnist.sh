@@ -74,10 +74,10 @@ python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --mai
 ## SGD (1 added layers)
 
 ### Freeze
-python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 5,0,0
 
 ### No Freeze
-python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --no-freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 2 --no-freeze --added_layer_conf 2,0,0
 
 
 ## SGD (2 added layers)
@@ -128,3 +128,63 @@ python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --mai
 
 python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 0 --replay_buffer_batch_size 20
 
+
+
+
+
+
+
+
+
+
+## Experiments
+
+## SGD 1 max 2 layers freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 2,0,0
+
+## SGD 1 max 1 layer freeze
+ython main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 1,0,0
+
+
+## SGD 2 max 2 layers freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 2 --freeze --added_layer_conf 2,0,0
+
+## SGD 2 max 1 layer freeze
+ython main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 2 --freeze --added_layer_conf 1,0,0
+
+
+## SGD 1 max 2 layers no freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --no-freeze --added_layer_conf 2,0,0
+
+
+## SGD 1 max 1 layer no freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --no-freeze --added_layer_conf 1,0,0
+
+
+# Replay
+## SGD 1 max 2 layers freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 2,0,0 --replay_buffer_batch_size 20
+
+## SGD 1 max 1 layer freeze
+ython main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset permuted_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 1,0,0 --replay_buffer_batch_size 20
+
+
+
+
+## SGD 1 max 2 layers freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 2,0,0
+
+## SGD 1 max 1 layer freeze
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 1,0,0
+
+
+### Replay
+## SGD 1 max 2 layers freeze replay
+python main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 2,0,0 --replay_buffer_batch_size 20
+
+## SGD 1 max 1 layer freeze replay
+ython main_mnist.py --main_optimizer 'sgd'  --lr_epochs 10 --cl_epochs 10 --main_online_lr 1e-2 --train-batch-size 128 --wd 1e-3 --cl_method 'sgd'  --cl_dataset split_mnist --num_tasks 5 --rank 0 --cl_error_threshold 10 --max_allowed_added_layers 1 --freeze --added_layer_conf 1,0,0 --replay_buffer_batch_size 20
+
+
+1 layer freeze none
+20

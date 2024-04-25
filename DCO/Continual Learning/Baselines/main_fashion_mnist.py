@@ -156,7 +156,7 @@ def main():
         if epoch % log_interval == 0:
             errors = []
             for i in range(1, args.num_tasks+1):
-                cur_error = trainer.test(args, mod_main, te_loaders[i], i)
+                cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i)
                 errors += [cur_error]
                 visdom_obj.line([cur_error],  [epoch], update='append', opts={'title':'%d-Task Error'%i}, win='cur_error_%d'%i, name = 'T', env='gpu:%d'%args.rank)
             current_point = utils.ravel_model_params(mod_main, False, 'cpu')
@@ -484,7 +484,7 @@ def main():
             if cl_epoch % log_interval == 0:
                 errors = []
                 for i in range(1, args.num_tasks+1):
-                    cur_error = trainer.test(args, mod_main, te_loaders[i], i)
+                    cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i)
                     errors += [cur_error]
                     visdom_obj.line([cur_error],  [(m_task-1)* args.cl_epochs+cl_epoch], update='append', opts={'title':'%d-Task Error'%i}, win='cur_error_%d'%i, name = 'T', env='gpu:%d'%args.rank)
                 if args.cl_method == 'dco':

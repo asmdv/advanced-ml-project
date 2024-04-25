@@ -52,7 +52,7 @@ def train(args, mod_main, opt_main, data, target, task, is_grad_acc = False):
         main_loss = F.cross_entropy(output, target)
     return main_loss
 
-def test(args, model, test_loader, task_num, epoch, task, prefix=''):
+def test(args, model, test_loader, task_num, epoch, task, record=True, prefix=''):
     '''
         Be careful about the multi-head setup for both loss and error
     '''
@@ -99,10 +99,11 @@ def test(args, model, test_loader, task_num, epoch, task, prefix=''):
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
-    res='Epoch {:2d} | Task {:2d} => Average TEST Loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-                  epoch, task_num, test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset))
-    print(prefix + res)
-    return 100. * (1-correct / len(test_loader.dataset))
+    if record:
+        res='Epoch {:2d} | Task {:2d} => Average TEST Loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
+                      epoch, task_num, test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset))
+        print(prefix + res)
+    return 100. * (1-correct / len(test_loader.dataset)), test_loss
 
 def ae_reg(args, mod_main, mod_main_center, opt_main, mod_ae, opt_ae, data, target):
     '''
