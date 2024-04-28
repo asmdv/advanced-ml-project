@@ -13,15 +13,29 @@ from data import DATASET_CONFIGS, MODEL_CONFIGS
 import train_utils
 import path_utils
 import numpy as np
+import dill as pickle
+from torch.utils.data import Subset
 
 def run_main(args, experiment_name):
-    print(f"Arguments: {args}")
-    save_object = {"errors": [], "n_tasks": args.num_tasks, "test_batch_loss": [[] for _ in range(args.num_tasks)], "test_batch_error": [[] for _ in range(args.num_tasks)]}
-    local_test_loss = [[] for _ in range(args.num_tasks)]
-    rbcl = None
-    if args.replay_buffer_batch_size:
+    checkpoint = False
+    if args.checkpoint:
+        checkpoint = True
+        print(f"Loading the checkpoint at {args.checkpoint}")
+        with open(args.checkpoint, 'rb') as file:
+            save_object = pickle.load(file)
+        args = save_object["args"]
+        local_test_loss = save_object["local_test_loss"]
+    else:
+        print(f"Arguments: {args}")
+        save_object = {"errors": [], "n_tasks": args.num_tasks, "test_batch_loss": [[] for _ in range(args.num_tasks)], "test_batch_error": [[] for _ in range(args.num_tasks)], "args": args}
+        local_test_loss = [[] for _ in range(args.num_tasks)]
+    if checkpoint:
+        rbcl = save_object["rbcl"]
+    elif args.replay_buffer_batch_size:
         rbcl = train_utils.ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size,
                                           batch_size=args.replay_buffer_batch_size)
+    else:
+        rbcl = None
 
     # // 1.2 Main model //
     """
@@ -69,12 +83,27 @@ def run_main(args, experiment_name):
         (3) for split mnist and split cifar-100: the sequence of tasks are defined by a sequence of labels
     """
     tr_loaders, te_loaders = [0], [0]
+    tr_loaders_full, te_loaders_full = [0], [0]
+
     for m_task in range(1, args.num_tasks + 1):
         if dataset_name == 'permuted_mnist':
-            tr_loaders += [get_data_loader(get_dataset(dataset_name, m_task, True), args.train_batch_size,
+            tr_dataset = get_dataset(dataset_name, m_task, True)
+            te_dataset = get_dataset(dataset_name, m_task, False)
+
+            train_indices, test_indices = torch.randperm(len(tr_dataset))[:100], torch.randperm(len(te_dataset))[:100]
+            tr_dataset_subset = Subset(tr_dataset, train_indices)
+            te_dataset_subset = Subset(te_dataset, test_indices)
+
+            tr_loaders += [get_data_loader(tr_dataset, args.train_batch_size,
                                            cuda=('cuda' in args.device))]
-            te_loaders += [get_data_loader(get_dataset(dataset_name, m_task, False), args.train_batch_size,
+            te_loaders += [get_data_loader(te_dataset, args.train_batch_size,
                                            cuda=('cuda' in args.device))]
+
+            tr_loaders_full += [get_data_loader(tr_dataset_subset, len(tr_dataset_subset),
+                                           cuda=('cuda' in args.device))]
+            te_loaders_full += [get_data_loader(te_dataset_subset, len(te_dataset_subset),
+                                           cuda=('cuda' in args.device))]
+
         elif dataset_name == 'split_mnist' or dataset_name == 'split_cifar10':
             m_label = m_task - 1
             tr_loaders += [get_label_data_loader(get_dataset(dataset_name, m_task, True), args.train_batch_size,
@@ -332,16 +361,19 @@ def run_main(args, experiment_name):
         for cl_epoch in range(args.cl_epochs):
             random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 5, args)
             for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
+                # batch_t = train_utils.calc_time()
                 # Adding replay buffer
+                # t = train_utils.calc_time()
                 if batch_idx in random_replay_batch_ids:
                     train_utils.add_to_replay_buffer(rbcl, m_task, data, target, args)
                 samples = train_utils.get_samples(rbcl, m_task, args)
+                # t = train_utils.calc_time(t, "Get_samples")
 
                 cur_iteration += 1
                 if args.cl_method == 'sgd':
                     train_utils.train_sgd_cl(args, mod_main, opt_main, data, target, task=m_task - 1)
                     train_utils.train_sgd_cl_replay(samples, args, mod_main, opt_main)
-
+                    # t = train_utils.calc_time(t, "train_sgd_cl")
                 elif args.cl_method == 'ewc':
                     train_utils.train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs,
                                              task=m_task - 1)
@@ -456,12 +488,14 @@ def run_main(args, experiment_name):
                 else:
                     raise ValueError('No named method')
 
+
+
                 def mov_avg(x, w):
                     for m in range(len(x) - (w - 1)):
                         yield sum(np.ones(w) * x[m:m + w]) / w
 
 
-                worse_perfomance = train_utils.each_batch_test(args, save_object, mod_main, te_loaders, m_task-1, local_test_loss)
+                worse_perfomance = train_utils.each_batch_test(args, save_object, mod_main, te_loaders_full, m_task-1, local_test_loss)
                 if worse_perfomance:
                     print(f"Recieved worse performance at batch {batch_idx}")
                     mod_main, added_layers_count = train_utils.handle_new_hidden_layer_logic(mod_main, args,
@@ -483,6 +517,7 @@ def run_main(args, experiment_name):
                                                                                           opt_main, visdom_obj)
 
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
+                # batch_t = train_utils.calc_time(batch_t, "Batch_time")
 
                 # # print("Previous tasks all: ", save_object["test_loss"][0])
                 # print(f"Batch {batch_idx}")
@@ -547,6 +582,10 @@ def run_main(args, experiment_name):
                                 opts={'title': 'Average Error'}, win='avg_error', name='T',
                                 env=f'{experiment_name}')
 
+            save_object["cur_task"] = m_task
+            save_object["cur_epoch"] = cl_epoch
+            save_object["rbcl"] = rbcl
+            save_object["local_test_loss"] = local_test_loss
             torch.save(save_object,
                        f'{experiment_name}/checkpoint.pt')
             plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
@@ -612,6 +651,7 @@ def main():
 
     # 1.1.1 Set up log file
     orig_stdout = sys.stdout
+
     f = open(f'{experiment_name}/log.txt', 'a')
     original = sys.stdout
     sys.stdout = path_utils.Tee(sys.stdout, f)

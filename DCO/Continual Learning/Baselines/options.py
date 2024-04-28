@@ -77,3 +77,5 @@ parser.add_argument('--max_allowed_added_layers', type=int, default=0)
 parser.add_argument('--freeze', action=argparse.BooleanOptionalAction, default=True)
 parser.add_argument('--added_layer_conf', type=str, default="0,0,0")
 parser.add_argument('--replay_buffer_batch_size', type=int, default=None)
+parser.add_argument('--checkpoint', type=str, default=None)
+

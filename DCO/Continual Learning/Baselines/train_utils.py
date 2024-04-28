@@ -6,7 +6,14 @@ import math
 import torch.nn.functional as F
 import path_utils
 from torchrl.data import ReplayBuffer, ListStorage, LazyTensorStorage, LazyMemmapStorage
+import utils
+import time
 
+def calc_time(t=None, name=None):
+    if not t:
+        return time.time()
+    print(f"Time for {name}: {(time.time() - t):.6f}")
+    return time.time()
 
 @tensorclass
 class ReplayBufferData:
@@ -70,7 +77,9 @@ def is_list_increase(x, w):
 def each_batch_test(args, save_object, mod_main, te_loaders, task_i, local_test_loss):
     # Run tests for each batch
     for i in range(args.num_tasks):
+        # t = calc_time()
         curr_error, test_loss = trainer.test(args, mod_main, te_loaders[task_i + 1], task_i + 1, None, i, False)
+        # t = calc_time(t, "trainer.test")
         save_object["test_batch_loss"][i].append(test_loss)
         save_object["test_batch_error"][i].append(curr_error)
         local_test_loss[i].append(test_loss)
@@ -199,3 +208,74 @@ def upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, 
     cl_opt_main = torch.optim.Adam(mod_main.parameters(), lr=args.main_online_lr)
     return mod_main_centers, mod_aes, opt_aes, cl_opt_main
 
+def train_task_1(args, mod_main, opt_main, m_task, visdom_obj, save_object, tmp_fisher_vars, big_omegas, rbcl, opt_main_scheduler, log_interval, tr_loaders, te_loaders, global_epoch, experiment_name, starting_point):
+    print(f"Training task 1")
+
+    cur_iteration = 0
+    for epoch in range(1, args.lr_epochs + 1):
+        random_replay_batch_ids = get_random_replay_batch_ids(1, len(tr_loaders[1]) - 1, args)
+        for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
+            if batch_idx in random_replay_batch_ids:
+                add_to_replay_buffer(rbcl, 1, data, target, args)
+
+            cur_iteration += 1
+            if args.cl_method == 'si' or args.cl_method == 'rwalk':
+                param1 = utils.ravel_model_params(mod_main, False, 'cpu')
+                main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task - 1)
+                main_loss.backward()
+                grad = utils.ravel_model_params(mod_main, True, 'cpu')  # 'plain' gradients without regularization
+                opt_main.step()
+                param2 = utils.ravel_model_params(mod_main, False, 'cpu')
+                small_omega += -grad * (param2 - param1)
+                if args.cl_method == 'rwalk':
+                    """ this part has a slightly different update rule for running fisher and its temporary variables: 
+                        (1) updates of small_omega and big_omega: agem/fc_permute_mnist.py (lines 319 ~ 334) --> important
+                        (2) update of running_fisher and temp_fisher_vars : agem/model (lines 1093 and 1094) and agem/model.py (lines 1087)
+                        (3) fisher_ema_decay should be 0.9 from agem codes of both permuted mnist and split cifar-100 
+                        CAERFUL don't forget to check if it is '+=' for big_omega and small_omega """
+                    tmp_fisher_vars += grad ** 2
+                    if cur_iteration == 1:  # initilaization for running fisher
+                        running_fisher = grad ** 2
+                    if cur_iteration % args.fisher_update_after == 0:
+                        # 1. update big omega
+                        cur_param = utils.ravel_model_params(mod_main, False, 'cpu')
+                        delta = running_fisher * ((cur_param - old_param) ** 2) + args.rwalk_epsilon
+                        big_omegas += torch.max(small_omega / delta, torch.zeros_like(small_omega)).to(args.device)
+                        # 2. update running fisher
+                        running_fisher = (1 - args.fisher_ema_decay) * running_fisher + (
+                                1.0 / args.fisher_update_after) * args.fisher_ema_decay * tmp_fisher_vars
+                        # 3. assign current parameters as old parameters
+                        old_param = cur_param
+                        # 4. reset small omega to zero
+                        small_omega = 0
+            else:
+                main_loss = trainer.train(args, mod_main, opt_main, data, target, task=0)
+                main_loss.backward()
+                opt_main.step()
+
+        opt_main_scheduler.step()
+        if epoch % log_interval == 0:
+            errors = []
+            for i in range(1, args.num_tasks + 1):
+                cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i, global_epoch + epoch, task=i - 1)
+                errors += [cur_error]
+                visdom_obj.line([cur_error], [global_epoch + epoch], update='append',
+                                opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i, name='T',
+                                env=f'{experiment_name}')
+                # Checking only task 1
+                # if epoch % args.lr_epochs == 0 and i == 1 and cur_error > cl_error_threshold:
+                #     print("Current error is bigger than threshold. Adding the new layer.")
+                #     # adding_new_hidden_layer = True
+                #     mod_main, added_layers_count = handle_new_hidden_layer_logic(mod_main, args, result_list, model_conf, added_layers_count)
+                #     # break
+                # elif epoch % args.lr_epochs == 0 and i == 1:
+                #     print(f"Success. Task 1 Error: {cur_error:.2f}. No need for adding layer")
+
+            current_point = utils.ravel_model_params(mod_main, False, 'cpu')
+            l2_norm = (current_point - starting_point).norm().item()
+            visdom_obj.line([l2_norm], [global_epoch + epoch], update='append', opts={'title': 'L2 Norm'},
+                            win='l2_norm', name='T', env=f'{experiment_name}')
+            visdom_obj.line([sum(errors) / args.num_tasks], [global_epoch + epoch], update='append',
+                            opts={'title': 'Average Error'}, win='avg_error', name='T', env=f'{experiment_name}')
+            save_object["errors"] += [errors]
+    return tmp_fisher_vars, big_omegas, global_epoch

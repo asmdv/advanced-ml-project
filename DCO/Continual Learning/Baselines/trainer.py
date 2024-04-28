@@ -98,12 +98,12 @@ def test(args, model, test_loader, task_num, epoch, task, record=True, prefix=''
                 pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
-    test_loss /= len(test_loader.dataset)
-    if record:
-        res='Epoch {:2d} | Task {:2d} => Average TEST Loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-                      epoch, task_num, test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset))
-        print(prefix + res)
-    return 100. * (1-correct / len(test_loader.dataset)), test_loss
+        test_loss /= len(test_loader.dataset)
+        if record:
+            res='Epoch {:2d} | Task {:2d} => Average TEST Loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
+                          epoch, task_num, test_loss, correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset))
+            print(prefix + res)
+        return 100. * (1-correct / len(test_loader.dataset)), test_loss
 
 def ae_reg(args, mod_main, mod_main_center, opt_main, mod_ae, opt_ae, data, target):
     '''

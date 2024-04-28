@@ -84,11 +84,11 @@ def get_dataset(name, m_task = 0, train=True, download=True):
     return dataset('./datasets/{name}'.format(name=name), train=train,
                    download=download, transform=transform)
 
-def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None, num_workers=1):
+def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None):
     return DataLoader(
         dataset, batch_size=batch_size,
         shuffle=True, collate_fn=(collate_fn or default_collate),
-        # **({'num_workers': num_workers, 'pin_memory': True} if cuda else {})
+        **({'num_workers': 4, 'pin_memory': True} if cuda else {})
     )
 
 # TODO: Temporary
