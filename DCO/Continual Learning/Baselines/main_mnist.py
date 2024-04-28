@@ -15,7 +15,7 @@ import path_utils
 import numpy as np
 import dill as pickle
 from torch.utils.data import Subset
-
+import copy
 def run_main(args, experiment_name):
     checkpoint = False
     if args.checkpoint:
@@ -37,6 +37,7 @@ def run_main(args, experiment_name):
     else:
         rbcl = None
 
+    expansion_epochs = []
     # // 1.2 Main model //
     """
         (1) by default the biases of all architectures are turned off.
@@ -360,7 +361,10 @@ def run_main(args, experiment_name):
         cur_iteration = 0
         for cl_epoch in range(args.cl_epochs):
             random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 5, args)
-            for batch_idx, (data, target) in enumerate(tr_loaders[m_task]):
+            batch_idx = 0
+            data, target = next(iter(tr_loaders[m_task]))
+            while batch_idx < len(tr_loaders[m_task]) - 1:
+                mod_main_copy = copy.deepcopy(mod_main)
                 # batch_t = train_utils.calc_time()
                 # Adding replay buffer
                 # t = train_utils.calc_time()
@@ -498,9 +502,12 @@ def run_main(args, experiment_name):
                 worse_perfomance = train_utils.each_batch_test(args, save_object, mod_main, te_loaders_full, m_task-1, local_test_loss)
                 if worse_perfomance:
                     print(f"Recieved worse performance at batch {batch_idx}")
+                    print(f"Rolling back to model on previous batch.")
+                    # mod_main = copy.deepcopy(mod_main_copy)
                     mod_main, added_layers_count = train_utils.handle_new_hidden_layer_logic(mod_main, args,
                                                               model_conf, added_layers_count,
                                                               m_task - 1)
+                    expansion_epochs.append(cl_epoch)
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
                         Fs = []
@@ -517,31 +524,12 @@ def run_main(args, experiment_name):
                                                                                           opt_main, visdom_obj)
 
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
-                # batch_t = train_utils.calc_time(batch_t, "Batch_time")
+                    worse_perfomance = False
+                    mod_main_copy = None
+                    # continue
 
-                # # print("Previous tasks all: ", save_object["test_loss"][0])
-                # print(f"Batch {batch_idx}")
-                #
-                # if len(save_object["test_batch_loss"][0]) > 10:
-                #     print("Task 1: Loss std: ", np.std(save_object["test_batch_loss"][0][-50::5]))
-                #     print("Task 1 Loss: ", save_object["test_batch_loss"][0][-1])
-                #     print("Task 1 Error std: ", np.std(save_object["test_batch_error"][0][-50::5]))
-                #     print("Task 1 Error: ", save_object["test_batch_error"][0][-1])
-                #     print("Task 1 Gradient Loss: ", np.gradient(save_object["test_batch_loss"][0][-50::5]))
-                #     print("Task 1 Gradient Error: ", np.gradient(save_object["test_batch_error"][0][-50::5]))
-                #     print("Task 1 Moving average loss (window 5):", list(mov_avg(save_object["test_batch_loss"][0][-50:], 5)))
-                #     print("Task 1 Moving average error (window 5):", list(mov_avg(save_object["test_batch_error"][0][-50:], 5)))
-                #
-                #     print()
-                #     print("Task 2: Loss std: ", np.std(save_object["test_batch_loss"][1][-50::5]))
-                #     print("Task 2 Loss: ", save_object["test_batch_loss"][1][-1])
-                #     print("Task 2 Error std: ", np.std(save_object["test_batch_error"][1][-50::5]))
-                #     print("Task 2 Error: ", save_object["test_batch_error"][1][-1])
-                #     print("Task 2 Gradient Loss: ", np.gradient(save_object["test_batch_loss"][1][-50::5]))
-                #     print("Task 2 Gradient Error: ", np.gradient(save_object["test_batch_error"][1][-50::5]))
-                #     print("Task 2 Moving average loss (window 5):", list(mov_avg(save_object["test_batch_loss"][1][-50:], 5)))
-                #     print("Task 2 Moving average error (window 5):", list(mov_avg(save_object["test_batch_error"][1][-50:], 5)))
-
+                batch_idx += 1
+                data, target = next(iter(tr_loaders[m_task]))
 
 
             if cl_epoch % log_interval == 0:
@@ -588,7 +576,7 @@ def run_main(args, experiment_name):
             save_object["local_test_loss"] = local_test_loss
             torch.save(save_object,
                        f'{experiment_name}/checkpoint.pt')
-            plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
+            plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs)
 
         # # Doing replay - old way
         # if args.cl_method == 'sgd':
@@ -621,7 +609,7 @@ def run_main(args, experiment_name):
 
     torch.save(save_object,
                f'{experiment_name}/final.pt')
-    plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
+    plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs)
 
     """
         To check the restuls, in Python3 with torch package imported: 

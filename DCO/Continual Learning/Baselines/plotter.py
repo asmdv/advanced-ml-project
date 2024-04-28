@@ -23,7 +23,7 @@ def plot_error_from_data(pt_data, show=False, save_path=None, expansion_epochs=[
     for task_idx, task_errors in enumerate(errors_per_task):
         plt.plot(range(1, len(task_errors) + 1), task_errors, label=f'Task {task_idx + 1}', linestyle='-')
     for expansion_epoch in expansion_epochs:
-        plt.vlines(expansion_epoch, plt.gca().get_ylim()[0], plt.gca().get_ylim()[1], label=f'Expansion {expansion_epoch}', colors='red')
+        plt.vlines(expansion_epoch, 0, 100, label=f'Expansion {expansion_epoch}', colors='red')
 
     plt.xlabel('Epochs')
     plt.ylabel('Error (%)')

@@ -43,16 +43,16 @@ def handle_new_hidden_layer_logic(mod_main, args, model_conf, added_layers_count
     if not (added_layers_count < args.max_allowed_added_layers):
         return mod_main, added_layers_count
     mod_local = mod_main.module if isinstance(mod_main, torch.nn.DataParallel) else mod_main
-    mod_local.print_grad_req_for_all_params()
     if args.freeze:
         mod_local.freeze_all_but_last(m_task)
-    mod_local.print_grad_req_for_all_params()
 
     if args.added_layer_conf[1] == 0:
         args.added_layer_conf[1] = model_conf['s_layer']
 
     mod_local.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0], same=args.added_layer_conf[1] == model_conf['s_layer'], task=m_task)
     print("Current mod_main tasks: ", mod_main.tasks)
+    print("Current mod_main output tasks: ", mod_main.tasks_output)
+
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     # mod_local.add_hidden_layer(len(mod_local.layers) - 3, model_conf['s_layer'])
     mod_main = mod_main.to(args.device)
@@ -69,22 +69,30 @@ def window_average(x, start, end=None):
 
 
 def is_list_increase(x, w):
-    old_increase = window_average(x, -2 * w, -w)
-    new_increase = window_average(x, -w)
+    old_increase = round(window_average(x, -2 * w, -w), 6)
+    new_increase = round(window_average(x, -w), 6)
+    if new_increase > old_increase:
+        print("Old")
+        print(x[-2*w:-w])
+        print("new")
+        print(x[-w:None])
+        new_increase = round(window_average(x, -w), 6)
+        print("New increase: ", new_increase)
+        print("Old increase", old_increase)
     return new_increase > old_increase
 
 
 def each_batch_test(args, save_object, mod_main, te_loaders, task_i, local_test_loss):
     # Run tests for each batch
-    for i in range(args.num_tasks):
+    for i in range(task_i):
         # t = calc_time()
         curr_error, test_loss = trainer.test(args, mod_main, te_loaders[task_i + 1], task_i + 1, None, i, False)
         # t = calc_time(t, "trainer.test")
         save_object["test_batch_loss"][i].append(test_loss)
         save_object["test_batch_error"][i].append(curr_error)
-        local_test_loss[i].append(test_loss)
-        mod_main.tasks_output[i]
-        if mod_main.tasks_output[i] == mod_main.tasks_output[task_i] and len(local_test_loss[i]) > 10:
+        if mod_main.tasks_output[i] == mod_main.tasks_output[-1]:
+            local_test_loss[i].append(test_loss)
+        if mod_main.tasks_output[i] == mod_main.tasks_output[-1] and len(local_test_loss[i]) > 10:
             list_increase = is_list_increase(local_test_loss[i], 5)
             if list_increase and i < task_i:
                 print(f"List increase in Task [{i}]")

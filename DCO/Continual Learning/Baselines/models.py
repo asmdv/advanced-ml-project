@@ -103,8 +103,8 @@ class MLP(nn.Module):
 
         prev_out_features = self.hidden_layers[-1].out_features
 
-        for i in range(task, len(self.tasks)):
-            self.tasks[i] += 1
+        # for i in range(task, len(self.tasks)):
+        #     self.tasks[i] += 1
 
         if count == 1:
             # output_layer = nn.Linear(prev_out_features, self.output_layers[-1].out_features, bias=False)
