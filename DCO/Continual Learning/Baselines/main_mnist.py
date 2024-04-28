@@ -90,7 +90,7 @@ def run_main(args, experiment_name):
             tr_dataset = get_dataset(dataset_name, m_task, True)
             te_dataset = get_dataset(dataset_name, m_task, False)
 
-            train_indices, test_indices = torch.randperm(len(tr_dataset))[:100], torch.randperm(len(te_dataset))[:100]
+            train_indices, test_indices = torch.randperm(len(tr_dataset))[:50], torch.randperm(len(te_dataset))[:50]
             tr_dataset_subset = Subset(tr_dataset, train_indices)
             te_dataset_subset = Subset(te_dataset, test_indices)
 
