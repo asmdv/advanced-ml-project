@@ -91,12 +91,12 @@ def plot_local_batch_error_from_data(pt_data, show=False, save_path=None):
         plt.show()
 
 def main():
-    filnames = ["/Users/asif/progs/02-uni/08-advanced-ml-project/DCO/Continual Learning/Baselines/experiments/exp_permuted_mnist_sgd_n_tasks_4_epochs_5_5_threshold_6.0_max_layers_5_freeze_layers_2_0_0_rb_None_2024-04-28_22_23_31/checkpoint.pt"]
+    filnames = ["/Users/asif/progs/02-uni/08-advanced-ml-project/DCO/Continual Learning/Baselines/scripts/experiments/exp_permuted_mnist_sgd_n_tasks_4_epochs_5_5_threshold_0_max_layers_10_freeze_layers_2_0_0_rb_64_2024-04-29_02_44_28/checkpoint.pt"]
     for file in filnames:
         # data_path = f'/Users/asif/Desktop/critical/experiments_ewc_mnists/{file}/checkpoint.pt'
         pt_data = load_data(file)
-        plot_error_from_data(pt_data, show=True)
-        # plot_local_batch_error_from_data(pt_data, show=True)
+        # plot_error_from_data(pt_data, show=True)
+        plot_local_batch_error_from_data(pt_data, show=True)
 
 if __name__ == '__main__':
     main()

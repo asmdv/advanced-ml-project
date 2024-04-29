@@ -662,9 +662,8 @@ def run_main(args, experiment_name):
                     opts={'title': 'Average Error'}, win='avg_error', name='T',
                     env=f'{experiment_name}')
 
-
-    torch.save(save_object,
-               f'{experiment_name}/final.pt')
+    with open(f'{experiment_name}/final.pt', 'wb') as file:
+        pickle.dump(save_object, file)
     plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
     plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots')
     print("Total time required: ")
