@@ -112,11 +112,34 @@ def run_main(args, experiment_name):
                                            cuda=('cuda' in args.device))]
 
         elif dataset_name == 'split_mnist' or dataset_name == 'split_cifar10':
+            tr_dataset = get_dataset(dataset_name, m_task, True)
+            te_dataset = get_dataset(dataset_name, m_task, False)
+
             m_label = m_task - 1
-            tr_loaders += [get_label_data_loader(get_dataset(dataset_name, m_task, True), args.train_batch_size,
+
+            # train_indices_subset, test_indices_subset = torch.randperm(len(tr_dataset))[:100], torch.randperm(len(te_dataset))[:100]
+            # tr_dataset_subset = Subset(tr_dataset, train_indices_subset)
+            # te_dataset_subset = Subset(te_dataset, test_indices_subset)
+            #
+            # train_indices, test_indices = torch.randperm(len(tr_dataset))[:len(tr_dataset) // 2], torch.randperm(len(te_dataset))[:len(te_dataset) // 2]
+            #
+            # tr_dataset = Subset(tr_dataset, train_indices)
+            # te_dataset = Subset(te_dataset, test_indices)
+            # print(tr_dataset)
+            # return
+
+            tr_loaders += [get_label_data_loader(tr_dataset, args.train_batch_size,
                                                  cuda=('cuda' in args.device),
                                                  labels=[m_label * 2, m_label * 2 + 1])]
-            te_loaders += [get_label_data_loader(get_dataset(dataset_name, m_task, False), args.train_batch_size,
+            te_loaders += [get_label_data_loader(te_dataset, args.train_batch_size,
+                                                 cuda=('cuda' in args.device),
+                                                 labels=[m_label * 2, m_label * 2 + 1])]
+
+
+            tr_loaders_full += [get_label_data_loader(tr_dataset, args.train_batch_size,
+                                                 cuda=('cuda' in args.device),
+                                                 labels=[m_label * 2, m_label * 2 + 1])]
+            te_loaders_full += [get_label_data_loader(te_dataset, args.train_batch_size,
                                                  cuda=('cuda' in args.device),
                                                  labels=[m_label * 2, m_label * 2 + 1])]
         elif dataset_name == 'split_cifar100':
@@ -172,6 +195,7 @@ def run_main(args, experiment_name):
 
     cur_iteration = 0
     for epoch in range(0, args.lr_epochs):
+        epoch_time = train_utils.calc_time()
         random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 1, args)
         for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
             if batch_idx in random_replay_batch_ids:
@@ -240,6 +264,8 @@ def run_main(args, experiment_name):
             visdom_obj.line([sum(errors) / args.num_tasks], [global_epoch + epoch], update='append',
                             opts={'title': 'Average Error'}, win='avg_error', name='T', env=f'{experiment_name}')
             save_object["errors"] += [errors]
+        epoch_time = train_utils.calc_time(epoch_time, "Epoch")
+
 
     # 3.1 Preparation before the 2nd and consequent tasks
     """
@@ -371,6 +397,7 @@ def run_main(args, experiment_name):
             raise ValueError('No named method')
 
         # training
+        epoch_time = train_utils.calc_time()
         cur_iteration = 0
         for cl_epoch in range(args.cl_epochs):
             random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 5, args)
@@ -598,7 +625,7 @@ def run_main(args, experiment_name):
             #            f'{experiment_name}/checkpoint.pt')
             plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
             plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots')
-
+        epoch_time = train_utils.calc_time(epoch_time, "Epoch")
     errors = []
     for i in range(1, args.num_tasks + 1):
         cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i,

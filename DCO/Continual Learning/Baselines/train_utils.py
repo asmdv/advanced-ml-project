@@ -12,7 +12,7 @@ import time
 def calc_time(t=None, name=None):
     if not t:
         return time.time()
-    print(f"Time for {name}: {(time.time() - t):.6f}")
+    print(f"Time consumed | {name}: {(time.time() - t):.6f}")
     return time.time()
 
 @tensorclass
