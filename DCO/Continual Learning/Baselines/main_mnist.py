@@ -28,7 +28,7 @@ def run_main(args, experiment_name):
         local_test_loss = save_object["local_test_loss"]
     else:
         print(f"Arguments: {args}")
-        save_object = {"errors": [], "n_tasks": args.num_tasks, "test_batch_loss": [], "test_batch_error": [], "args": args}
+        save_object = {"errors": [], "n_tasks": args.num_tasks, "test_batch_loss": [], "test_batch_error": [], "args": args, "expansion_epochs": []}
         local_test_loss = [[] for _ in range(args.num_tasks)]
     # if checkpoint:
     #     rbcl = save_object["rbcl"]
@@ -38,7 +38,6 @@ def run_main(args, experiment_name):
     else:
         rbcl = None
 
-    expansion_epochs = []
     # // 1.2 Main model //
     """
         (1) by default the biases of all architectures are turned off.
@@ -137,7 +136,7 @@ def run_main(args, experiment_name):
     global_epoch = 0
     added_layers_count = 0
     max_allowed_added_layers = args.max_allowed_added_layers
-    batches_in_epoch = len(tr_loaders[1])
+    save_object["batches_in_epoch"] = len(tr_loaders[1])
 
     # // 2.1 Preparation before the 1st task //
     """ Algorithms:
@@ -527,8 +526,8 @@ def run_main(args, experiment_name):
                     mod_main, added_layers_count = train_utils.handle_new_hidden_layer_logic(mod_main, args,
                                                               model_conf, added_layers_count,
                                                               m_task - 1)
-                    expansion_epochs.append(global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch)
-                    print("Expansion epochs", expansion_epochs)
+                    save_object["expansion_epochs"].append(global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch)
+                    print("Expansion epochs", save_object["expansion_epochs"])
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
                         Fs = []
@@ -597,8 +596,8 @@ def run_main(args, experiment_name):
                 pickle.dump(save_object, file)
             # torch.save(save_object,
             #            f'{experiment_name}/checkpoint.pt')
-            plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs)
-            plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs, batches_in_epoch=batches_in_epoch)
+            plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
+            plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots')
 
     errors = []
     for i in range(1, args.num_tasks + 1):
@@ -623,10 +622,8 @@ def run_main(args, experiment_name):
 
     torch.save(save_object,
                f'{experiment_name}/final.pt')
-    plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs)
-    plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots',
-                                             expansion_epochs=expansion_epochs,
-                                             batches_in_epoch=batches_in_epoch)
+    plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
+    plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots')
     print("Total time required: ")
     """
         To check the restuls, in Python3 with torch package imported: 
