@@ -24,13 +24,15 @@ def plot_error_from_data(pt_data, show=False, save_path=None):
 
     plt.figure(figsize=(14, 8))
 
-    plt.plot(range(0, num_epochs), average_errors_across_tasks, label='Average', marker='o', linewidth=2, color=GLOBAL_COLORS[0])
-
     for task_idx, task_errors in enumerate(errors_per_task):
         plt.plot(range(0, len(task_errors)), task_errors, label=f'Task {task_idx + 1}', linestyle='-', color=GLOBAL_COLORS[task_idx + 1])
 
+    plt.plot(range(0, num_epochs), average_errors_across_tasks, label='Average', marker='o', linewidth=2, color=GLOBAL_COLORS[0])
+
+
     for expansion_epoch in expansion_epochs:
         plt.vlines(expansion_epoch, 0, 100, colors=GLOBAL_COLORS[-1], linestyles='--')
+
 
     plt.xlabel('Epochs')
     plt.ylabel('Error (%)')
@@ -67,15 +69,13 @@ def plot_local_batch_error_from_data(pt_data, show=False, save_path=None):
             plt.vlines(c, 0, 100, colors='gray', linestyles='--', alpha=0.2)
             c += batches_in_epoch
 
-    for expansion_epoch in expansion_epochs:
-        plt.vlines(expansion_epoch * batches_in_epoch, 0, 100, colors=GLOBAL_COLORS[-1], linestyle='--')
-
-
-    plt.plot(range(1, num_epochs + 1), average_errors_across_tasks, label='Average', linewidth=2, color=GLOBAL_COLORS[0])
-
     for task_idx, task_errors in enumerate(errors_per_task):
         plt.plot(range(1, len(task_errors) + 1), task_errors, label=f'Task {task_idx + 1}', linestyle='-', color=GLOBAL_COLORS[task_idx+1])
 
+    plt.plot(range(1, num_epochs + 1), average_errors_across_tasks, label='Average', linewidth=2, color=GLOBAL_COLORS[0])
+
+    for expansion_epoch in expansion_epochs:
+        plt.vlines(expansion_epoch * batches_in_epoch, 0, 100, colors=GLOBAL_COLORS[-1], linestyle='--')
 
     plt.xlabel('Mini-batch')
     plt.ylabel('Error (%)')
