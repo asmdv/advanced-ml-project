@@ -83,7 +83,6 @@ def get_dataset(name, m_task = 0, train=True, download=True):
         transform = transforms.Compose(transform)
     return dataset('./datasets/{name}'.format(name=name), train=train,
                    download=download, transform=transform)
-
 def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None):
     return DataLoader(
         dataset, batch_size=batch_size,

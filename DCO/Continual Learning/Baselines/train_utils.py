@@ -82,7 +82,6 @@ def is_list_increase(x, w):
         pass
     return new_increase > old_increase, old_increase, new_increase
 
-
 def each_batch_test(args, save_object, mod_main, te_loaders, task_i, local_test_loss):
     # Run tests for each batch
     # cl_error_threshold
@@ -167,7 +166,6 @@ def train_dco_cl_replay(samples, args, mod_main, opt_main, data, target, m_task,
     for task_i, sample in enumerate(samples):
         ae_loss, grad_norm = train_dco_cl(args, mod_main, opt_main, data, target, m_task, mod_main_centers, cl_opt_main, mod_aes, opt_aes, task=task_i)
     return ae_loss, grad_norm
-
 
 def add_to_replay_buffer(rbcl, m_task, data, target, args):
     if args.replay_buffer_batch_size:
