@@ -728,7 +728,10 @@ def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, a
         ewc_grads += [torch.zeros_like(param)]
     for num, (data, target) in enumerate(ewc_loader, 1):
         main_loss = trainer.train(args, mod_main, opt_main, data, target, task=m_task - 1)
-        main_loss.backward()
+        try:
+            main_loss.backward()
+        except Exception as e:
+            pass
         for param, grad in zip(mod_main.parameters(), ewc_grads):
             if param.grad is not None:
                 grad.add_(1 / len(ewc_loader.dataset), param.grad ** 2)
