@@ -97,8 +97,18 @@ class MLP(nn.Module):
 
     def unfreeze(self, task):
         t = tuple(self.named_parameters())
-        for name, param in t:
-            print(name)
+        self.input_layer.requires_grad_(True)
+        for i in range(self.tasks[task] + 1):
+            self.hidden_layers[i].requires_grad_(True)
+        self.output_layers[task].requires_grad_(True)
+
+    def freeze(self, task):
+        t = tuple(self.named_parameters())
+        self.input_layer.requires_grad_(False)
+        for i in range(self.tasks[task] + 1):
+            self.hidden_layers[i].requires_grad_(False)
+        self.output_layers[task].requires_grad_(False)
+
 
     def add_hidden_layerV3(self, new_layer_size, task, count=1, same=False):
         # if layer_index < 0 or layer_index >= len(self.layers):

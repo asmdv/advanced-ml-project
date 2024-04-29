@@ -125,8 +125,12 @@ def train_sgd_cl_replay(samples, args, mod_main, opt_main):
     if not args.replay_buffer_batch_size:
         return
     for task_i, sample in enumerate(samples):
+        if args.max_allowed_added_layers > 0:
+            mod_main.unfreeze(task_i)
         train_sgd_cl(args, mod_main, opt_main, sample.images, sample.labels, task_i)
-
+        if args.max_allowed_added_layers > 0:
+            mod_main.freeze(task_i)
+        # mod_main.print_grad_req_for_all_params()
 
 def train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs, task):
     """ For each task we save a seperate Fisher matrix and a set of optimal parameters. """

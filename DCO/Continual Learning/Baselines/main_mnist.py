@@ -50,6 +50,21 @@ def run_main(args, experiment_name):
         input_size, output_size = DATASET_CONFIGS[dataset_name]['size'] ** 2, DATASET_CONFIGS[dataset_name]['classes']
         mod_main = MLP(args, input_size, output_size, hidden_size=model_conf['s_layer'],
                        hidden_layer_num=model_conf['n_layer'])
+
+        # # train_utils.handle_new_hidden_layer_logic(mod_main, args, model_conf, 0, 1)
+        # mod_main.add_hidden_layerV3(args.added_layer_conf[1], count=args.added_layer_conf[0],
+        #                              same=args.added_layer_conf[1] == model_conf['s_layer'], task=1)
+        # print("Before")
+        # mod_main.print_grad_req_for_all_params()
+        # print(mod_main.tasks)
+        # print(mod_main.tasks_output)
+        # mod_main.freeze(1)
+        # print("After freeze")
+        # mod_main.print_grad_req_for_all_params()
+        # mod_main.unfreeze(1)
+        # print("After unfreeze")
+        # mod_main.print_grad_req_for_all_params()
+        # return
     elif 'cifar' in args.cl_dataset:
         mod_main = Conv(args)
     else:
@@ -404,8 +419,8 @@ def run_main(args, experiment_name):
             batch_idx = 0
             data, target = next(iter(tr_loaders[m_task]))
             while batch_idx < len(tr_loaders[m_task]) - 1:
-                path = f"{experiment_name}/t.pt"
-                torch.save(mod_main.state_dict(), path)
+                # path = f"{experiment_name}/t.pt"
+                # torch.save(mod_main.state_dict(), path)
                 # mod_main_ref = copy.deepcopy(mod_main.state_dict())
                 # opt_main_copy = copy.deepcopy(opt_main)
                 # mod_main_copy = copy.deepcopy(mod_main)
@@ -422,6 +437,7 @@ def run_main(args, experiment_name):
                     # print("SGD task ", m_task - 1)
                     train_utils.train_sgd_cl(args, mod_main, opt_main, data, target, task=m_task - 1)
                     train_utils.train_sgd_cl_replay(samples, args, mod_main, opt_main)
+                    # return
                     # t = train_utils.calc_time(t, "train_sgd_cl")
                 elif args.cl_method == 'ewc':
                     train_utils.train_ewc_cl(args, mod_main, opt_main, data, target, mod_main_centers, Fs,
@@ -625,7 +641,7 @@ def run_main(args, experiment_name):
             #            f'{experiment_name}/checkpoint.pt')
             plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots')
             plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots')
-        epoch_time = train_utils.calc_time(epoch_time, "Epoch")
+            epoch_time = train_utils.calc_time(epoch_time, "Epoch")
     errors = []
     for i in range(1, args.num_tasks + 1):
         cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i,
