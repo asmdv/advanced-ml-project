@@ -86,12 +86,12 @@ def run_main(args, experiment_name):
 
     # // 1.3 visdom: https://github.com/facebookresearch/visdom //
     """ a open-source visualization tool from facebook (tested on 0.1.8.8 version) """
-    try:
-        visdom_obj = utils.get_visdom(args, experiment_name)
-    except Exception as e:
-        print(e)
-        print('[Visdom] ===> De-activated')
-
+    # try:
+    #     visdom_obj = utils.get_visdom(args, experiment_name)
+    # except Exception as e:
+    #     print(e)
+    #     print('[Visdom] ===> De-activated')
+    #
     # // 1.4 Define task datasets and their dataloders //
     """
         (1) structure of the task loader is: [0, dataset_1, dataset_2, ..., dataset_n]
@@ -260,9 +260,9 @@ def run_main(args, experiment_name):
             for i in range(1, args.num_tasks + 1):
                 cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i, global_epoch + epoch, task=i - 1)
                 errors += [cur_error]
-                visdom_obj.line([cur_error], [global_epoch + epoch], update='append',
-                                opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i, name='T',
-                                env=f'{experiment_name}')
+                # # visdom_obj.line([cur_error], [global_epoch + epoch], update='append',
+                #                 opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i, name='T',
+                #                 env=f'{experiment_name}')
                 # Checking only task 1
                 # if epoch % args.lr_epochs == 0 and i == 1 and cur_error > cl_error_threshold:
                 #     print("Current error is bigger than threshold. Adding the new layer.")
@@ -274,10 +274,10 @@ def run_main(args, experiment_name):
 
             current_point = utils.ravel_model_params(mod_main, False, 'cpu')
             l2_norm = (current_point - starting_point).norm().item()
-            visdom_obj.line([l2_norm], [global_epoch + epoch], update='append', opts={'title': 'L2 Norm'},
-                            win='l2_norm', name='T', env=f'{experiment_name}')
-            visdom_obj.line([sum(errors) / args.num_tasks], [global_epoch + epoch], update='append',
-                            opts={'title': 'Average Error'}, win='avg_error', name='T', env=f'{experiment_name}')
+            # visdom_obj.line([l2_norm], [global_epoch + epoch], update='append', opts={'title': 'L2 Norm'},
+            #                 win='l2_norm', name='T', env=f'{experiment_name}')
+            # visdom_obj.line([sum(errors) / args.num_tasks], [global_epoch + epoch], update='append',
+            #                 opts={'title': 'Average Error'}, win='avg_error', name='T', env=f'{experiment_name}')
             save_object["errors"] += [errors]
         epoch_time = train_utils.calc_time(epoch_time, "Epoch")
 
@@ -407,7 +407,7 @@ def run_main(args, experiment_name):
             """
             mod_main_centers, mod_aes, opt_aes, cl_opt_main = train_utils.upgrade_dco(mod_main_centers, mod_aes, opt_aes,
                                                                           mod_main, tr_loaders, args, m_task,
-                                                                          opt_main, visdom_obj)
+                                                                          opt_main, None)
         else:
             raise ValueError('No named method')
 
@@ -584,7 +584,7 @@ def run_main(args, experiment_name):
                             mod_main_centers, mod_aes, opt_aes, cl_opt_main = train_utils.upgrade_dco(mod_main_centers, mod_aes,
                                                                                           opt_aes, mod_main,
                                                                                           tr_loaders, args, m_task,
-                                                                                          opt_main, visdom_obj)
+                                                                                          opt_main, None)
 
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
                     continue
@@ -600,36 +600,37 @@ def run_main(args, experiment_name):
                                              global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch,
                                              task=i - 1)
                     errors += [cur_error]
-                    visdom_obj.line([cur_error], [global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch],
-                                    update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
-                                    name='T', env=f'{experiment_name}')
+                    # visdom_obj.line([cur_error], [global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch],
+                    #                 update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
+                    #                 name='T', env=f'{experiment_name}')
 
-                if args.cl_method == 'dco':
-                    for i in range(m_task - 1):
-                        visdom_obj.line([ae_loss[i].item()],
-                                        [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
-                                        opts={'title': '%d-AE Loss' % i}, win='ae_loss_%d' % i, name='T',
-                                        env=f'{experiment_name}')
-                    print('The grad norm is', grad_norm)
-                    try:
-                        visdom_obj.line([grad_norm], [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch],
-                                        update='append', opts={'title': 'Grad Norm'}, win='grad_norm', name='T',
-                                        env=f'{experiment_name}')
-                    except:
-                        visdom_obj.line([grad_norm.item()],
-                                        [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
-                                        opts={'title': 'Grad Norm'}, win='grad_norm', name='T',
-                                        env=f'{experiment_name}')
+                # if args.cl_method == 'dco':
+                    # for i in range(m_task - 1):
+                        # visdom_obj.line([ae_loss[i].item()],
+                        #                 [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
+                        #                 opts={'title': '%d-AE Loss' % i}, win='ae_loss_%d' % i, name='T',
+                        #                 env=f'{experiment_name}')
+                    # print('The grad norm is', grad_norm)
+                    # try:
+                        # visdom_obj.line([grad_norm], [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch],
+                        #                 update='append', opts={'title': 'Grad Norm'}, win='grad_norm', name='T',
+                        #                 env=f'{experiment_name}')
+
+                    # except:
+                        # visdom_obj.line([grad_norm.item()],
+                        #                 [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
+                        #                 opts={'title': 'Grad Norm'}, win='grad_norm', name='T',
+                        #                 env=f'{experiment_name}')
                 current_point = utils.ravel_model_params(mod_main, False, 'cpu')
                 l2_norm = (current_point - starting_point).norm().item()
                 save_object["errors"] += [errors]
-                visdom_obj.line([l2_norm], [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch],
-                                update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
-                                env=f'{experiment_name}')
-                visdom_obj.line([sum(errors) / args.num_tasks],
-                                [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
-                                opts={'title': 'Average Error'}, win='avg_error', name='T',
-                                env=f'{experiment_name}')
+                # visdom_obj.line([l2_norm], [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch],
+                #                 update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
+                #                 env=f'{experiment_name}')
+                # visdom_obj.line([sum(errors) / args.num_tasks],
+                #                 [global_epoch + (m_task - 1) * args.cl_epochs + cl_epoch], update='append',
+                #                 opts={'title': 'Average Error'}, win='avg_error', name='T',
+                #                 env=f'{experiment_name}')
 
             save_object["cur_task"] = m_task
             save_object["cur_epoch"] = cl_epoch
@@ -647,20 +648,20 @@ def run_main(args, experiment_name):
         cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i,
                                  global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs, task=i - 1)
         errors += [cur_error]
-        visdom_obj.line([cur_error], [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs],
-                        update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
-                        name='T', env=f'{experiment_name}')
+        # visdom_obj.line([cur_error], [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs],
+        #                 update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
+        #                 name='T', env=f'{experiment_name}')
 
     current_point = utils.ravel_model_params(mod_main, False, 'cpu')
     l2_norm = (current_point - starting_point).norm().item()
     save_object["errors"] += [errors]
-    visdom_obj.line([l2_norm], [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs],
-                    update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
-                    env=f'{experiment_name}')
-    visdom_obj.line([sum(errors) / args.num_tasks],
-                    [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs], update='append',
-                    opts={'title': 'Average Error'}, win='avg_error', name='T',
-                    env=f'{experiment_name}')
+    # visdom_obj.line([l2_norm], [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs],
+    #                 update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
+    #                 env=f'{experiment_name}')
+    # visdom_obj.line([sum(errors) / args.num_tasks],
+    #                 [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs], update='append',
+    #                 opts={'title': 'Average Error'}, win='avg_error', name='T',
+    #                 env=f'{experiment_name}')
 
     with open(f'{experiment_name}/final.pt', 'wb') as file:
         pickle.dump(save_object, file)

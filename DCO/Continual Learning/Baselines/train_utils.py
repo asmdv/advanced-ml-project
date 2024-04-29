@@ -188,7 +188,7 @@ def get_random_replay_batch_ids(start, end, args):
             args.replay_buffer_batch_size / args.train_batch_size) * 2)
     return random_replay_batch_id
 
-def upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, m_task, opt_main, visdom_obj):
+def upgrade_dco(mod_main_centers, mod_aes, opt_aes, mod_main, tr_loaders, args, m_task, opt_main):
     # Method 1: pushing inside the cone
     # mod_main_center = copy.deepcopy(list(mod_main.parameters()))
     # for _ in range(args.prox_epochs-1):

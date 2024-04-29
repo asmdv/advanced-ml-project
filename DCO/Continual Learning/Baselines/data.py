@@ -77,7 +77,8 @@ def get_dataset(name, m_task = 0, train=True, download=True):
         length = DATASET_CONFIGS[name]['size']**2
         channel = DATASET_CONFIGS[name]['channels']
         m_permutation = np.random.permutation(length* channel)
-        trans_permutation = transforms.Lambda(lambda x: _permutate_image_pixels(x, m_permutation))
+        # trans_permutation = transforms.Lambda(lambda x: _permutate_image_pixels(x, m_permutation))
+        trans_permutation = PermutationTransform(m_permutation)
         transform = transforms.Compose(transform + [trans_permutation])
     else:
         transform = transforms.Compose(transform)
@@ -87,7 +88,7 @@ def get_data_loader(dataset, batch_size, cuda=False, collate_fn=None):
     return DataLoader(
         dataset, batch_size=batch_size,
         shuffle=True, collate_fn=(collate_fn or default_collate),
-        # **({'num_workers': 4, 'pin_memory': True} if cuda else {})
+        **({'num_workers': 4, 'pin_memory': True} if cuda else {})
     )
 
 # TODO: Temporary
@@ -102,8 +103,14 @@ def get_label_data_loader(dataset, batch_size, cuda=False, collate_fn=None, labe
                     if dataset.targets[i] in labels]
     my_dataset = Subset(dataset, indices)
     return get_data_loader(my_dataset, batch_size, cuda=cuda, collate_fn=collate_fn)
-
 def _permutate_image_pixels(image, m_permutation, dataset = 'permuted_mnist'):
     size = image.size()
     image = image.view(-1)[m_permutation]
     return image.view(size)
+
+class PermutationTransform(object):
+    def __init__(self, permutation_matrix):
+        self.permutation_matrix = permutation_matrix
+
+    def __call__(self, x):
+        return _permutate_image_pixels(x, self.permutation_matrix)
