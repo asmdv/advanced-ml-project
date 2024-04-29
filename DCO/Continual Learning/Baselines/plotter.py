@@ -23,7 +23,7 @@ def plot_error_from_data(pt_data, show=False, save_path=None, expansion_epochs=[
     for task_idx, task_errors in enumerate(errors_per_task):
         plt.plot(range(1, len(task_errors) + 1), task_errors, label=f'Task {task_idx + 1}', linestyle='-')
     for expansion_epoch in expansion_epochs:
-        plt.vlines(expansion_epoch, 0, 100, label=f'Expansion {expansion_epoch}', colors='red')
+        plt.vlines(expansion_epoch, 0, 100, colors='red')
 
     plt.xlabel('Epochs')
     plt.ylabel('Error (%)')
@@ -35,6 +35,47 @@ def plot_error_from_data(pt_data, show=False, save_path=None, expansion_epochs=[
     plt.xticks(fontsize=6)
     if save_path:
         plt.savefig(f"{save_path}/errors.png")
+    if show:
+        plt.show()
+
+def plot_local_batch_error_from_data(pt_data, show=False, save_path=None, expansion_epochs=[], expansion_batches=[], batches_in_epoch=None):
+    errors = pt_data['test_batch_error']
+    average_errors_across_tasks = []
+    errors_per_task = [[] for _ in range(len(errors[0]))]
+    for epoch_data in errors:
+        average_errors_across_tasks.append(sum(epoch_data) / len(epoch_data))
+        for task_index, error in enumerate(epoch_data):
+            errors_per_task[task_index].append(error)
+
+    num_epochs = len(errors)
+
+    plt.figure(figsize=(14, 8))
+
+    plt.plot(range(1, num_epochs + 1), average_errors_across_tasks, label='Average across all tasks', linewidth=2)
+
+    if batches_in_epoch:
+        c = batches_in_epoch
+        while (c < plt.gca().get_xlim()[1]):
+            plt.vlines(c, 0, 100, colors='gray')
+            c += batches_in_epoch
+
+    for expansion_epoch in expansion_epochs:
+        plt.vlines(expansion_epoch * batches_in_epoch, 0, 100, colors='red', linestyle='--')
+
+    for task_idx, task_errors in enumerate(errors_per_task):
+        plt.plot(range(1, len(task_errors) + 1), task_errors, label=f'Task {task_idx + 1}', linestyle='-')
+
+
+    plt.xlabel('Mini-batch')
+    plt.ylabel('Error (%)')
+    # plt.title('Average Error across All Tasks and Individual Task Errors over Epochs')
+    plt.legend(loc='upper right')
+    # plt.grid(True)
+    # plt.xticks(range(1, num_epochs + 1))
+
+    plt.xticks(fontsize=6)
+    if save_path:
+        plt.savefig(f"{save_path}/batch-errors.png")
     if show:
         plt.show()
 

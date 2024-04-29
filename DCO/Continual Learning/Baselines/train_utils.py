@@ -72,34 +72,46 @@ def is_list_increase(x, w):
     old_increase = round(window_average(x, -2 * w, -w), 6)
     new_increase = round(window_average(x, -w), 6)
     if new_increase > old_increase:
-        print("Old")
-        print(x[-2*w:-w])
-        print("new")
-        print(x[-w:None])
-        new_increase = round(window_average(x, -w), 6)
-        print("New increase: ", new_increase)
-        print("Old increase", old_increase)
-    return new_increase > old_increase
+        # print("Old")
+        # print(x[-2*w:-w])
+        # print("new")
+        # print(x[-w:None])
+        # new_increase = round(window_average(x, -w), 6)
+        # print("New increase: ", new_increase)
+        # print("Old increase", old_increase)
+        pass
+    return new_increase > old_increase, old_increase, new_increase
 
 
 def each_batch_test(args, save_object, mod_main, te_loaders, task_i, local_test_loss):
     # Run tests for each batch
-    for i in range(task_i):
+    window = 5
+    list_increase_confirmed = False
+    local_test_batch_loss = [[] for _ in range(args.num_tasks)]
+    local_test_batch_error = [[] for _ in range(args.num_tasks)]
+    for i in range(args.num_tasks):
         # t = calc_time()
-        curr_error, test_loss = trainer.test(args, mod_main, te_loaders[task_i + 1], task_i + 1, None, i, False)
+        curr_error, test_loss = trainer.test(args, mod_main, te_loaders[i + 1], i + 1, None, task=i, record=False)
         # t = calc_time(t, "trainer.test")
-        save_object["test_batch_loss"][i].append(test_loss)
-        save_object["test_batch_error"][i].append(curr_error)
+        local_test_batch_error[i] = curr_error
+        local_test_batch_loss[i] = test_loss
         if mod_main.tasks_output[i] == mod_main.tasks_output[-1]:
             local_test_loss[i].append(test_loss)
-        if mod_main.tasks_output[i] == mod_main.tasks_output[-1] and len(local_test_loss[i]) > 10:
-            list_increase = is_list_increase(local_test_loss[i], 5)
+        if mod_main.tasks_output[i] == mod_main.tasks_output[-1] and len(local_test_loss[i]) > 10 and args.max_allowed_added_layers > 0:
+            list_increase, old_increase, new_increase = is_list_increase(local_test_loss[i], window)
             if list_increase and i < task_i:
                 print(f"List increase in Task [{i}]")
-                print("Local test loss", local_test_loss[i])
+                print(f"Local test loss[{i}]", local_test_loss[0][-11:])
+                print("Old/New:", old_increase, new_increase)
+                list_increase_confirmed = True
+                # print("Local test loss", local_test_loss[i])
                 local_test_loss[i] = []
-                return True
-    return False
+        local_test_loss[i] = local_test_loss[i][-4*window:]
+        # print("Local test loss:", local_test_loss)
+
+    save_object["test_batch_loss"].append(local_test_batch_loss)
+    save_object["test_batch_error"].append(local_test_batch_error)
+    return list_increase_confirmed
 
 def train_sgd_cl(args, mod_main, opt_main, data, target, task):
     main_loss = trainer.train(args, mod_main, opt_main, data, target, task)

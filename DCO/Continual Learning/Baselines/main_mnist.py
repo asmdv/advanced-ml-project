@@ -17,6 +17,7 @@ import dill as pickle
 from torch.utils.data import Subset
 import copy
 def run_main(args, experiment_name):
+    global_time = time.time()
     checkpoint = False
     if args.checkpoint:
         checkpoint = True
@@ -27,11 +28,11 @@ def run_main(args, experiment_name):
         local_test_loss = save_object["local_test_loss"]
     else:
         print(f"Arguments: {args}")
-        save_object = {"errors": [], "n_tasks": args.num_tasks, "test_batch_loss": [[] for _ in range(args.num_tasks)], "test_batch_error": [[] for _ in range(args.num_tasks)], "args": args}
+        save_object = {"errors": [], "n_tasks": args.num_tasks, "test_batch_loss": [], "test_batch_error": [], "args": args}
         local_test_loss = [[] for _ in range(args.num_tasks)]
-    if checkpoint:
-        rbcl = save_object["rbcl"]
-    elif args.replay_buffer_batch_size:
+    # if checkpoint:
+    #     rbcl = save_object["rbcl"]
+    if args.replay_buffer_batch_size:
         rbcl = train_utils.ReplayBufferCL(n_tasks=args.num_tasks, max_size=3 * args.replay_buffer_batch_size,
                                           batch_size=args.replay_buffer_batch_size)
     else:
@@ -86,14 +87,20 @@ def run_main(args, experiment_name):
     tr_loaders, te_loaders = [0], [0]
     tr_loaders_full, te_loaders_full = [0], [0]
 
+
     for m_task in range(1, args.num_tasks + 1):
         if dataset_name == 'permuted_mnist':
             tr_dataset = get_dataset(dataset_name, m_task, True)
             te_dataset = get_dataset(dataset_name, m_task, False)
 
-            train_indices, test_indices = torch.randperm(len(tr_dataset))[:50], torch.randperm(len(te_dataset))[:50]
-            tr_dataset_subset = Subset(tr_dataset, train_indices)
-            te_dataset_subset = Subset(te_dataset, test_indices)
+            train_indices_subset, test_indices_subset = torch.randperm(len(tr_dataset))[:100], torch.randperm(len(te_dataset))[:100]
+            tr_dataset_subset = Subset(tr_dataset, train_indices_subset)
+            te_dataset_subset = Subset(te_dataset, test_indices_subset)
+
+            train_indices, test_indices = torch.randperm(len(tr_dataset))[:len(tr_dataset) // 2], torch.randperm(len(te_dataset))[:len(te_dataset) // 2]
+
+            tr_dataset = Subset(tr_dataset, train_indices)
+            te_dataset = Subset(te_dataset, test_indices)
 
             tr_loaders += [get_data_loader(tr_dataset, args.train_batch_size,
                                            cuda=('cuda' in args.device))]
@@ -130,6 +137,7 @@ def run_main(args, experiment_name):
     global_epoch = 0
     added_layers_count = 0
     max_allowed_added_layers = args.max_allowed_added_layers
+    batches_in_epoch = len(tr_loaders[1])
 
     # // 2.1 Preparation before the 1st task //
     """ Algorithms:
@@ -158,10 +166,13 @@ def run_main(args, experiment_name):
         (2) small_omega: track the contribution to the change of loss function of each individual parameter
         (3) big_omega: track the distance between current parameters and previous parameters
     """
+    # worse_perfomance = train_utils.each_batch_test(args, save_object, mod_main, te_loaders_full, 0,
+    #                                                local_test_loss)
+
     print(f"Training task 1")
 
     cur_iteration = 0
-    for epoch in range(1, args.lr_epochs + 1):
+    for epoch in range(0, args.lr_epochs):
         random_replay_batch_ids = train_utils.get_random_replay_batch_ids(1, len(tr_loaders[1]) - 1, args)
         for batch_idx, (data, target) in enumerate(tr_loaders[1], 1):
             if batch_idx in random_replay_batch_ids:
@@ -201,6 +212,9 @@ def run_main(args, experiment_name):
                 main_loss = trainer.train(args, mod_main, opt_main, data, target, task=0)
                 main_loss.backward()
                 opt_main.step()
+
+            worse_perfomance = train_utils.each_batch_test(args, save_object, mod_main, te_loaders_full, 0,
+                                                           local_test_loss)
 
         opt_main_scheduler.step()
         if epoch % log_interval == 0:
@@ -364,7 +378,11 @@ def run_main(args, experiment_name):
             batch_idx = 0
             data, target = next(iter(tr_loaders[m_task]))
             while batch_idx < len(tr_loaders[m_task]) - 1:
-                mod_main_copy = copy.deepcopy(mod_main)
+                path = f"{experiment_name}/t.pt"
+                torch.save(mod_main.state_dict(), path)
+                # mod_main_ref = copy.deepcopy(mod_main.state_dict())
+                # opt_main_copy = copy.deepcopy(opt_main)
+                # mod_main_copy = copy.deepcopy(mod_main)
                 # batch_t = train_utils.calc_time()
                 # Adding replay buffer
                 # t = train_utils.calc_time()
@@ -375,6 +393,7 @@ def run_main(args, experiment_name):
 
                 cur_iteration += 1
                 if args.cl_method == 'sgd':
+                    # print("SGD task ", m_task - 1)
                     train_utils.train_sgd_cl(args, mod_main, opt_main, data, target, task=m_task - 1)
                     train_utils.train_sgd_cl_replay(samples, args, mod_main, opt_main)
                     # t = train_utils.calc_time(t, "train_sgd_cl")
@@ -492,22 +511,24 @@ def run_main(args, experiment_name):
                 else:
                     raise ValueError('No named method')
 
-
-
-                def mov_avg(x, w):
-                    for m in range(len(x) - (w - 1)):
-                        yield sum(np.ones(w) * x[m:m + w]) / w
-
-
                 worse_perfomance = train_utils.each_batch_test(args, save_object, mod_main, te_loaders_full, m_task-1, local_test_loss)
                 if worse_perfomance:
                     print(f"Recieved worse performance at batch {batch_idx}")
                     print(f"Rolling back to model on previous batch.")
                     # mod_main = copy.deepcopy(mod_main_copy)
+                    # mod_main.load_state_dict(mod_main_ref)
+                    # opt_main = copy.deepcopy(opt_main_copy)
+                    # old_weights = torch.load(path)
+                    # print(old_weights)
+                    # return
+                    # print(old_weights == mod_main.state_dict())
+                    # return
+                    # mod_main.load_state_dict(torch.load(path))
                     mod_main, added_layers_count = train_utils.handle_new_hidden_layer_logic(mod_main, args,
                                                               model_conf, added_layers_count,
                                                               m_task - 1)
-                    expansion_epochs.append(cl_epoch)
+                    expansion_epochs.append(global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch)
+                    print("Expansion epochs", expansion_epochs)
                     if args.cl_method == 'ewc':
                         mod_main_centers = []
                         Fs = []
@@ -524,9 +545,7 @@ def run_main(args, experiment_name):
                                                                                           opt_main, visdom_obj)
 
                     starting_point = utils.ravel_model_params(mod_main, False, 'cpu')
-                    worse_perfomance = False
-                    mod_main_copy = None
-                    # continue
+                    continue
 
                 batch_idx += 1
                 data, target = next(iter(tr_loaders[m_task]))
@@ -536,10 +555,10 @@ def run_main(args, experiment_name):
                 errors = []
                 for i in range(1, args.num_tasks + 1):
                     cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i,
-                                             global_epoch + (m_task - 1) * args.cl_epochs + (cl_epoch + 1),
+                                             global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch,
                                              task=i - 1)
                     errors += [cur_error]
-                    visdom_obj.line([cur_error], [global_epoch + (m_task - 1) * args.cl_epochs + (cl_epoch + 1)],
+                    visdom_obj.line([cur_error], [global_epoch + args.lr_epochs + (m_task - 2) * args.cl_epochs + cl_epoch],
                                     update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
                                     name='T', env=f'{experiment_name}')
 
@@ -572,37 +591,32 @@ def run_main(args, experiment_name):
 
             save_object["cur_task"] = m_task
             save_object["cur_epoch"] = cl_epoch
-            save_object["rbcl"] = rbcl
+            # save_object["rbcl"] = rbcl
             save_object["local_test_loss"] = local_test_loss
-            torch.save(save_object,
-                       f'{experiment_name}/checkpoint.pt')
+            with open(f'{experiment_name}/checkpoint.pt', 'wb') as file:
+                pickle.dump(save_object, file)
+            # torch.save(save_object,
+            #            f'{experiment_name}/checkpoint.pt')
             plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs)
-
-        # # Doing replay - old way
-        # if args.cl_method == 'sgd':
-        #     handle_replay_sgd(m_task, args, mod_main, opt_main, rbcl)
-        # elif args.cl_method == 'ewc':
-        #     handle_replay_ewc(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, Fs)
-        # elif args.cl_method == 'dco':
-        #     handle_replay_dco(m_task, args, mod_main, opt_main, rbcl, mod_main_centers, cl_opt_main, mod_aes, opt_aes)
+            plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs, batches_in_epoch=batches_in_epoch)
 
     errors = []
     for i in range(1, args.num_tasks + 1):
         cur_error, test_loss = trainer.test(args, mod_main, te_loaders[i], i,
-                                 global_epoch + (args.num_tasks) * args.cl_epochs + 1, task=i - 1)
+                                 global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs, task=i - 1)
         errors += [cur_error]
-        visdom_obj.line([cur_error], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
+        visdom_obj.line([cur_error], [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs],
                         update='append', opts={'title': '%d-Task Error' % i}, win='cur_error_%d' % i,
                         name='T', env=f'{experiment_name}')
 
     current_point = utils.ravel_model_params(mod_main, False, 'cpu')
     l2_norm = (current_point - starting_point).norm().item()
     save_object["errors"] += [errors]
-    visdom_obj.line([l2_norm], [global_epoch + (args.num_tasks) * args.cl_epochs + 1],
+    visdom_obj.line([l2_norm], [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs],
                     update='append', opts={'title': 'L2 Norm'}, win='l2_norm', name='T',
                     env=f'{experiment_name}')
     visdom_obj.line([sum(errors) / args.num_tasks],
-                    [global_epoch + (args.num_tasks) * args.cl_epochs + 1], update='append',
+                    [global_epoch + args.lr_epochs + (args.num_tasks-1) * args.cl_epochs], update='append',
                     opts={'title': 'Average Error'}, win='avg_error', name='T',
                     env=f'{experiment_name}')
 
@@ -610,7 +624,10 @@ def run_main(args, experiment_name):
     torch.save(save_object,
                f'{experiment_name}/final.pt')
     plotter.plot_error_from_data(save_object, save_path=f'{experiment_name}/plots', expansion_epochs=expansion_epochs)
-
+    plotter.plot_local_batch_error_from_data(save_object, save_path=f'{experiment_name}/plots',
+                                             expansion_epochs=expansion_epochs,
+                                             batches_in_epoch=batches_in_epoch)
+    print("Total time required: ")
     """
         To check the restuls, in Python3 with torch package imported: 
             (1) load average errors : average_errors = torch.load('res-%d.pt'%args.rank)
@@ -620,7 +637,6 @@ def run_main(args, experiment_name):
 
 
 
-#  -------------- \\ Main codes begin here \\ -------------
 def main():
     # // 1.1 Arguments //
     print('[INIT] ===> Defining models in process')
@@ -646,6 +662,7 @@ def main():
 
 
     run_main(args, experiment_name)
+#  -------------- \\ Main codes begin here \\ -------------
 
 def upgrade_mod_main_ewc(mod_main_centers, Fs, mod_main, dataset_name, m_task, args, opt_main):
     """
@@ -689,5 +706,4 @@ def handle_layer_conf_args(layer_arg):
     return layer_arg
 
 if __name__ == '__main__':
-
     main()
