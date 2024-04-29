@@ -85,6 +85,7 @@ def is_list_increase(x, w):
 
 def each_batch_test(args, save_object, mod_main, te_loaders, task_i, local_test_loss):
     # Run tests for each batch
+    # cl_error_threshold
     window = 5
     list_increase_confirmed = False
     local_test_batch_loss = [[] for _ in range(args.num_tasks)]
@@ -99,7 +100,7 @@ def each_batch_test(args, save_object, mod_main, te_loaders, task_i, local_test_
             local_test_loss[i].append(test_loss)
         if mod_main.tasks_output[i] == mod_main.tasks_output[-1] and len(local_test_loss[i]) > 10 and args.max_allowed_added_layers > 0:
             list_increase, old_increase, new_increase = is_list_increase(local_test_loss[i], window)
-            if list_increase and i < task_i:
+            if list_increase and i < task_i and save_object["test_batch_error"][-1][i] > args.cl_error_threshold:
                 print(f"List increase in Task [{i}]")
                 print(f"Local test loss[{i}]", local_test_loss[0][-11:])
                 print("Old/New:", old_increase, new_increase)

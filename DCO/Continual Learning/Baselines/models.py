@@ -95,6 +95,11 @@ class MLP(nn.Module):
                 param.requires_grad = False
         print(f"All layers except the outputs frozen successfully.")
 
+    def unfreeze(self, task):
+        t = tuple(self.named_parameters())
+        for name, param in t:
+            print(name)
+
     def add_hidden_layerV3(self, new_layer_size, task, count=1, same=False):
         # if layer_index < 0 or layer_index >= len(self.layers):
         #     raise ValueError("Invalid layer_index")
