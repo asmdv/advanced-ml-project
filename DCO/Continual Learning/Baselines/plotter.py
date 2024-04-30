@@ -10,17 +10,23 @@ def load_data(pt_data_path):
 
 GLOBAL_COLORS = ["#7eb0d5", "#fd7f6f", "#b2e061", "#bd7ebe", "#ffb55a", "#ffee65", "#beb9db", "#fdcce5", "#8bd3c7", "#991f17"]
 
-def plot_error_from_data(pt_data, show=False, save_path=None):
+
+def get_errors(pt_data):
     errors = pt_data['errors']
-    expansion_epochs = pt_data['expansion_epochs']
     average_errors_across_tasks = []
     errors_per_task = [[] for _ in range(len(errors[0]))]
     for epoch_data in errors:
         average_errors_across_tasks.append(sum(epoch_data) / len(epoch_data))
         for task_index, error in enumerate(epoch_data):
             errors_per_task[task_index].append(error)
+    return {"average_error": average_errors_across_tasks, "task_error": errors_per_task}
 
-    num_epochs = len(errors)
+def plot_error_from_data(pt_data, show=False, save_path=None):
+    expansion_epochs = pt_data['expansion_epochs']
+    formatted_errors = get_errors(pt_data)
+    errors_per_task = formatted_errors['task_error']
+    average_errors_across_tasks = formatted_errors['average_error']
+    num_epochs = len(average_errors_across_tasks)
 
     plt.figure(figsize=(14, 8))
 
@@ -91,7 +97,7 @@ def plot_local_batch_error_from_data(pt_data, show=False, save_path=None):
         plt.show()
 
 def main():
-    filnames = ["/Users/asif/progs/02-uni/08-advanced-ml-project/DCO/Continual Learning/Baselines/scripts/experiments/exp_permuted_mnist_sgd_n_tasks_4_epochs_5_5_threshold_0_max_layers_10_freeze_layers_2_0_0_rb_64_2024-04-29_02_44_28/checkpoint.pt"]
+    filnames = ["/Users/asif/progs/02-uni/08-advanced-ml-project/DCO/Continual Learning/Baselines/experiments/exp_permuted_mnist_sgd_n_tasks_5_epochs_5_5_threshold_0.0_max_layers_10_freeze_layers_2_0_0_rb_64_2024-04-29_11_28_15/final.pt"]
     for file in filnames:
         # data_path = f'/Users/asif/Desktop/critical/experiments_ewc_mnists/{file}/checkpoint.pt'
         pt_data = load_data(file)
